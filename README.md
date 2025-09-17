@@ -1,4 +1,4 @@
-# CW Slack Connector v2 🚀
+# SlackWise 🚀
 
 A lightweight Spring Boot bridge that syncs ConnectWise service tickets and notes with a Slack channel — built for fast iteration and real-world integrations. ⚡️
 
