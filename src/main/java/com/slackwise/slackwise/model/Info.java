@@ -26,6 +26,7 @@ public class Info {
     public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
     }
+
 }
 
     

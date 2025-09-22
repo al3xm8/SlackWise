@@ -20,7 +20,7 @@ public class SlackController {
     AmazonService amazonService;
 
     @Autowired
-    ConnectwiseService ticketService;
+    ConnectwiseService connectwiseService;
 
     /**
      * Handles incoming Slack events, including URL verification challenges.
@@ -68,7 +68,7 @@ public class SlackController {
                 }
                 if (ticketNumber != null) {
                     System.out.println("Message in thread for ticket " + ticketNumber + ": " + text + " from user " + user);
-                    ticketService.addSlackReplyToTicket(ticketNumber, text, event);
+                    connectwiseService.addSlackReplyToTicket(ticketNumber, text, event);
                 } else {
                     System.out.println("No ticket found for thread_ts: " + threadTs + " or ts: " + ts);
                 }

@@ -15,7 +15,7 @@ public class TimeEntry {
 
     private String chargeToType;
     
-    private String note;
+    private String notes;
     
     private String timeStart;
     
@@ -73,12 +73,12 @@ public class TimeEntry {
         this.chargeToType = chargeToType;
     }
 
-    public String getNote() {
-        return note;
+    public String getNotes() {
+        return notes;
     }
 
-    public void setNote(String notes) {
-        this.note = notes;
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public String getTimeStart() {

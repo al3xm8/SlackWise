@@ -214,7 +214,7 @@ public class Ticket {
     public List<Note> getDiscussion() {
         List<Note> allNotes = new ArrayList<>();
 
-        System.out.println("Fetching discussion for ticket " + id);
+        //System.out.println("Fetching discussion for ticket " + id);
 
         // Add existing notes
         if (notes != null) {
@@ -224,11 +224,11 @@ public class Ticket {
         // Add notes from time entries as Note objects
         if (timeEntries != null) {
             for (TimeEntry te : timeEntries) {
-                if (te.getNote() != null && !te.getNote().isEmpty()) {
+                if (te.getNotes() != null && !te.getNotes().isEmpty()) {
                     Note n = new Note();
                     n.setId(te.getTimeEntryId());
                     n.setTicketId(te.getTicketId());
-                    n.setText(te.getNote());
+                    n.setText(te.getNotes());
 
                     Contact c = new Contact();
                     c.setId(te.getMemberId());
@@ -287,7 +287,7 @@ public class Ticket {
             sb.append("Time Entry ID: ").append(te.getTimeEntryId())
               .append(", Member: ").append(te.getMember() != null ? te.getMember().getName() : "N/A")
               .append(", Date Entered: ").append(te.getDateEntered())
-              .append(", Notes: ").append(te.getNote())
+              .append(", Notes: ").append(te.getNotes())
 
               .append("\n");
         }
@@ -304,5 +304,24 @@ public class Ticket {
               .append("\n");
         }
         return sb.toString();
+    }
+
+    public void printTicket(int ticketId) {
+
+        System.out.println("Ticket ID: " + ticketId);
+        System.out.println("Summary: " + summary);
+        System.out.println("Status: " + (status != null ? status.name : "N/A"));
+        System.out.println("Company: " + (company != null ? company.getIdentifier() : "N/A"));
+        System.out.println("Contact: " + (contact != null ? contact.getName() : "N/A"));
+        System.out.println("Contact Phone: " + contactPhoneNumber);
+        System.out.println("Contact Email: " + contactEmailAddress);
+        System.out.println("Type: " + (type != null ? type.name : "N/A"));
+        System.out.println("SubType: " + (subType != null ? subType.name : "N/A"));
+        System.out.println("Closed Flag: " + closedFlag);
+        System.out.println("Actual Hours: " + actualHours);
+        System.out.println("Resources: " + resources);
+        System.out.println("Time Entries:\n" + printTimeEntries());
+        System.out.println("Notes:\n" + printNotes());
+        System.out.println("Discussion:\n" + printDiscussion());
     }
 }

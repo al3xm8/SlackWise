@@ -22,6 +22,8 @@ public class Note {
 
     private Contact contact;
 
+    private Member member;
+
     private String dateCreated;
 
     private String timeStart;
@@ -90,6 +92,14 @@ public class Note {
         this.contact = contact;
     }
 
+    public Member getMember() {
+        return member;
+    }
+
+    public void setMember(Member member) {
+        this.member = member;
+    }
+
     public String getDateCreated() {
         return dateCreated;
     }
@@ -122,9 +132,27 @@ public class Note {
         this.info = info;
     }
 
-    public void setContactId(Object contactId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setContactId'");
+    public void setContactId(int contactId) {
+        this.contact.setId(contactId);
     }
+
+    public void printNote() {
+        System.out.println("Note ID: " + id);
+        System.out.println("Ticket ID: " + ticketId);
+        System.out.println("Text: " + text);
+        System.out.println("Detail Description Flag: " + detailDescriptionFlag);
+        System.out.println("Internal Analysis Flag: " + internalAnalysisFlag);
+        System.out.println("Resolution Flag: " + resolutionFlag);
+        if (contact != null) {
+            System.out.println("Contact ID: " + contact.getID());
+            System.out.println("Contact Name: " + contact.getName());
+        } else {
+            System.out.println("Member ID: " + member.getId());
+            System.out.println("Member Name: " + member.getName());
+        }
+        System.out.println("Date Created: " + dateCreated);
+        System.out.println("Time Start: " + timeStart);
+        System.out.println("Time End: " + timeEnd);
+    }   
 
 }

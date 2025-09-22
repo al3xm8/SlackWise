@@ -30,18 +30,14 @@ public class SlackService {
     // Slack client instance
     private final Slack slack = Slack.getInstance();
 
-    // Store open ticket IDs
-    //private Map<Integer, String> noteIdTothreadTS = new HashMap<>();
-    
     @Autowired
     private AmazonService amazonService;
 
     @Autowired
-    private ConnectwiseService ticketService;
+    private ConnectwiseService connectwiseService;
 
-    /**
-     * Handle posting a new ticket to Slack.
-     * 
+     /**
+     * Handle posting a NEW ticket to Slack.
      * 
      * @param ticketId
      * @param summary
@@ -54,30 +50,20 @@ public class SlackService {
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
-        try {
-            amazonService.createTicketItem(ticketId, "");
-        } catch (Exception e) {
-            System.out.println("Warning: failed to create DynamoDB ticket item:\n" + e.getMessage());
+
+        if (amazonService.createTicketItem(ticketId, "") == false) {
+            // Ticket item already exists, so another process has already posted the Slack message.
+            System.out.println("Ticket item already exists for ticketId: " + ticketId + ", skipping Slack post.");
+            return null;
         }
 
-        // If the ticket item already existed and already has a thread_ts, return early.
-        try {
-            Map<String, software.amazon.awssdk.services.dynamodb.model.AttributeValue> existing = amazonService.getTicket(ticketId);
-            if (existing != null && existing.containsKey("ts_thread") && existing.get("ts_thread").s() != null && !existing.get("ts_thread").s().isBlank()) {
-                System.out.println("Ticket " + ticketId + " already has a Slack thread ts (" + existing.get("ts_thread").s() + "). Skipping postNewTicket.");
-                return null;
-            }
-        } catch (Exception e) {
-            // If Dynamo lookup fails, log and continue to attempt posting (fail open)
-            System.out.println("Warning: failed to read existing ticket from DynamoDB for id " + ticketId + ":\n" + e.getMessage());
-        }
-        // Get contact name that is associated with ticket
-        String contactName = ticketService.getContactName(ticketId);
-        
+        // Get the contact name for new ticket
+        String contactName = connectwiseService.getContactNameByTicketId(ticketId);
+
         // Post to Slack
         ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                 .channel(slackChannelId)
-                .text("🆔: " + ticketId + "\n👤: " + contactName + "\nSummary📝: " + summary)
+                .text("🆔" + ticketId + "\n👤" + contactName + "\n📝: " + summary)
         );
 
         if (!response.isOk()) {
@@ -87,75 +73,21 @@ public class SlackService {
 
         String postedTs = response.getTs();
 
-        // Try to set the thread ts only if it is still missing. If another process set it first, delete our message.
-        boolean set = false;
-        try {
-            set = amazonService.setThreadTs(ticketId, postedTs);
-        } catch (Exception e) {
-            System.out.println("Warning: failed to set thread ts in DynamoDB for ticket " + ticketId + ": " + e.getMessage());
-        }
-
-        if (!set) {
-            // Another process won the race. Delete the message we just posted to avoid duplicate top-level messages.
-            try {
-                slack.methods(slackBotToken).chatDelete(req -> req
+        if (!amazonService.setThreadTs(ticketId, postedTs)) {
+            slack.methods(slackBotToken).chatDelete(req -> req
                     .channel(slackChannelId)
                     .ts(postedTs)
-                );
-            } catch (Exception e) {
-                System.out.println("Warning: failed to delete duplicate Slack message: " + e.getMessage());
-            }
+            );
+
+            System.out.println("Another process set ts_thread for ticketId: " + ticketId + ", deleted duplicate Slack message.");  
             return null;
         }
 
-        // We successfully set the thread ts; ensure the item is persisted with notes empty list
-        try {
-            amazonService.updateThreadTs(ticketId, postedTs);
-        } catch (Exception e) {
-            System.out.println("Warning: failed to persist thread ts in DynamoDB for ticket " + ticketId + ": " + e.getMessage());
-        }
+        amazonService.updateThreadTs(ticketId, postedTs);
 
         return response;
     }
 
-    /**
-     * When posting a new note
-     * 
-     * @param ticketId
-     * @param noteId
-     * @param noteText
-     * @return 
-     * @throws IOException
-     * @throws SlackApiException
-     */
-    public ChatPostMessageResponse postNote(String ticketId, String noteId, String noteText) throws IOException, SlackApiException {
-        
-        // Get thread timestamp from DynamoDB
-        Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
-        String tsThread = ticket.get("ts_thread").s();
-
-        // Post to Slack in the designated thread
-        ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
-                .channel(slackChannelId)
-                .text("🆔: " + noteId + "\nNote: " + noteText)
-                .threadTs(tsThread)
-        );
-
-        if (response.isOk()) {
-            // Save noteId and ts in DynamoDB
-            amazonService.addNoteToTicket(
-                ticketId,
-                noteId,
-                response.getTs()
-            );
-        } else {
-            System.out.println("Failed to post note to Slack: " + response.getError());
-        }
-
-        return response;
-    }
-
-    
     /**
      * Update Slack thread for a ticket with new notes
      * 
@@ -166,17 +98,17 @@ public class SlackService {
      * @throws IOException 
      */
     public List<ChatPostMessageResponse> updateTicketThread(String ticketId, List<Note> discussion) throws IOException, InterruptedException {
-        
+
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
         List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
-        
-        // Always fetch thread_ts and posted notes from DynamoDB
+
+        // Fetch thread_ts and posted notes from DynamoDB
         Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
 
         // If Dynamo lookup fails, log and continue to attempt posting (fail open)
         String tsThread = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
-        
+
         // Keep track of already posted note IDs to avoid duplicates
         // If ticket or notes are null, postedNoteIds will remain empty
         Set<String> postedNoteIds = new HashSet<>();
@@ -195,18 +127,19 @@ public class SlackService {
         if (tsThread == null) {
             System.out.println("No thread_ts found for ticket " + ticketId + ". Posting as top-level message.");
         }
+
         // Post each note that hasn't been posted yet
         for (Note note : discussion) {
             String noteIdStr = String.valueOf(note.getId());
 
-            String contactName = ticketService.getContactName(ticketId, note.getId());
+            String contactName = connectwiseService.getContactNameByTicketNoteId(ticketId, note.getId());
 
             // Only post if this note ID hasn't been posted yet
             if (!postedNoteIds.contains(noteIdStr)) {
                 try {
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
-                            .text("🆔:" + note.getId() + "\n👤: " + contactName + "\n\n" + note.getText() + "\n_________________________________")
+                            .text("🆔" + note.getId() + "\n👤 " + contactName + "\n\n" + note.getText() + "\n_________________________________")
                             .threadTs(tsThread)
                     );
 
