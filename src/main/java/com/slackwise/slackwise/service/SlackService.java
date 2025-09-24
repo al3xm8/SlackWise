@@ -1,9 +1,16 @@
 package com.slackwise.slackwise.service;
 
 import com.slackwise.slackwise.model.Note;
+
+import java.util.regex.Matcher;
+
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.model.block.ImageBlock;
+import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.SectionBlock;
+import com.slack.api.model.block.composition.MarkdownTextObject;
 
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -12,10 +19,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.random.RandomGenerator;
+import java.util.regex.Pattern;
 
 @Service
 public class SlackService {
@@ -103,6 +114,9 @@ public class SlackService {
         // This could involve searching for the original message and posting a reply
         List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
 
+        // Delay in case of concurrent events (avoids race conditions)
+        Thread.sleep(500);
+
         // Fetch thread_ts and posted notes from DynamoDB
         Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
 
@@ -131,12 +145,13 @@ public class SlackService {
         // Post each note that hasn't been posted yet
         for (Note note : discussion) {
             String noteIdStr = String.valueOf(note.getId());
-
-            String contactName = connectwiseService.getContactNameByTicketNoteId(ticketId, note.getId());
+            String contactName = note.getContact() != null ? note.getContact().getName() : note.getMember().getName();
 
             // Only post if this note ID hasn't been posted yet
             if (!postedNoteIds.contains(noteIdStr)) {
                 try {
+                    // TODO: Parse the text for picure links and add them to the bot response
+
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
                             .text("🆔" + note.getId() + "\n👤 " + contactName + "\n\n" + note.getText() + "\n_________________________________")

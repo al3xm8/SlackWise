@@ -33,6 +33,12 @@ public class TimeEntry {
     
     @JsonProperty("addToResolutionFlag")
     private boolean resolutionFlag;
+
+    private boolean emailResourceFlag;
+
+    private boolean emailContactFlag;
+    
+    private boolean emailCcFlag;
     
     @JsonProperty("member")
     private Member member;
@@ -113,16 +119,36 @@ public class TimeEntry {
         this.hoursDeduct = hoursDeduct;
     }
 
+    public boolean getEmailResourceFlag () {
+        return emailResourceFlag;
+    }
+
+    public void setEmailResourceFlag(boolean emailResourceFlag) {
+        this.emailResourceFlag = emailResourceFlag;
+    }
+
+    public boolean getEmailContactFlag () {
+        return emailResourceFlag;
+    }
+
+    public void setEmailContactFlag (boolean emailContactFlag) {
+        this.emailContactFlag = emailContactFlag;
+    }
+
+    public boolean getEmailCcFlag () {
+        return emailCcFlag;
+    }
+
+    public void setEmailCcFlag (boolean emailCcFlag) {
+        this.emailCcFlag = emailCcFlag;
+    }
+
     public boolean isDetailDescriptionFlag() {
         return detailDescriptionFlag;
     }
 
     public void setDetailDescriptionFlag(boolean detailDescriptionFlag) {
         this.detailDescriptionFlag = detailDescriptionFlag;
-    }
-
-    public boolean getdeailedDescriptionFlag() {
-        return detailDescriptionFlag;
     }
 
     public boolean isInternalAnalysisFlag() {

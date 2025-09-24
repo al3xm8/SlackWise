@@ -273,9 +273,9 @@ public class Ticket {
         StringBuilder sb = new StringBuilder();
         for (Note note : notes) {
             sb.append("Note ID: ").append(note.getId())
-              .append(", Text: ").append(note.getText())
-              .append(", Contact: ").append(note.getContact() != null ? note.getContact().getName() : "N/A")
+              .append(", Contact: ").append(note.getContact() != null ? note.getContact().getName() : note.getMember().getName())
               .append(", Date Created: ").append(note.getDateCreated())
+              .append(", Text:\n").append(note.getText())
               .append("\n");
         }
         return sb.toString();
@@ -287,8 +287,7 @@ public class Ticket {
             sb.append("Time Entry ID: ").append(te.getTimeEntryId())
               .append(", Member: ").append(te.getMember() != null ? te.getMember().getName() : "N/A")
               .append(", Date Entered: ").append(te.getDateEntered())
-              .append(", Notes: ").append(te.getNotes())
-
+              .append(", Notes:\n").append(te.getNotes())
               .append("\n");
         }
         return sb.toString();
@@ -298,9 +297,9 @@ public class Ticket {
         StringBuilder sb = new StringBuilder();
         for (Note note : discussion) {
             sb.append("Note ID: ").append(note.getId())
-              .append("\nContact: ").append(note.getContact() != null ? note.getContact().getName() : "N/A")
-              .append("\nDate Created: ").append(note.getDateCreated())
-              .append(", Text: ").append(note.getText())
+              .append(", Contact: ").append(note.getContact() != null ? note.getContact().getName() : note.getMember().getName())
+              .append(", Date Created: ").append(note.getDateCreated())
+              .append(", Text:\n").append(note.getText())
               .append("\n");
         }
         return sb.toString();

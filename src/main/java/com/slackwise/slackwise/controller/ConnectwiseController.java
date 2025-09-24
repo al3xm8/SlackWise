@@ -54,10 +54,14 @@ public class ConnectwiseController {
     public void initTickets() {
 
         companies.add("19300"); // Test company ID, add more if you want to track multiple companies
+        companies.add("250");
 
         try {
             // Replace with your actual company ID if needed
-            connectwiseService.tickets = getOpenTicketsByCompanyId("19300");
+            for (String companyId : companies) {
+                List<Ticket> tickets = getOpenTicketsByCompanyId((String)companyId);
+                System.out.println("Initialized with " + tickets.size() + " open tickets for company ID: " + companyId);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             connectwiseService.tickets = null;
@@ -113,6 +117,7 @@ public class ConnectwiseController {
             System.out.println("Extracted ticket ID: " + ticketId);
         } else  {
             System.out.println("No ticket ID found in payload");
+            System.out.println("__________________________________________________________________"); // Separator for logs
             return ResponseEntity.badRequest().body("No ticket ID found in payload");
         }
 
@@ -134,6 +139,7 @@ public class ConnectwiseController {
 
             if (entity == null) {
                 System.out.println("Entity is null (Ticket has not been changed). Skipping processing for ticket ID: " + recordId);
+                System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No Entity found in payload");
             }
 
@@ -141,13 +147,14 @@ public class ConnectwiseController {
             Map<String, Object> company = (Map<String, Object>) entity.get("company");
             
             if (company != null && company.get("id") != null) {
-                companyId = (String) company.get("id");
+                companyId = String.valueOf(company.get("id"));
                 System.out.println("Extracted companyId: " + companyId);
             }
 
         } else {
             System.out.println("No Entity found in payload. (This is likely not a ticket.)");
             System.out.println(payload);
+            System.out.println("__________________________________________________________________"); // Separator for logs
             return ResponseEntity.badRequest().body("No Entity found in payload");
         }
 
@@ -159,11 +166,11 @@ public class ConnectwiseController {
         if (companies.contains(companyId)) {
             Ticket ticket = connectwiseService.fetchTicketById(companyId, ticketId.toString());
 
-            // If ticket fetch failed, log and return
+            // If ticketFetch successful
             if (ticket != null) {
 
                 // If ticket is already in openTicketList, treat as update
-                if (openTicketList.contains(ticketId)) {
+                if (openTicketList.contains(ticketId) && payload.get("Action") == "updated") {
                     System.out.println("Ticket " + ticketId + " is already in openTicketList.");
 
                     System.out.println("Updating Slack thread for ticket: " + ticketId);
@@ -171,11 +178,13 @@ public class ConnectwiseController {
                     System.out.println("Thread updated.");
 
                     System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
+                    System.out.println("__________________________________________________________________"); // Separator for logs
                     return ResponseEntity.ok("Processed update event for ticketId: " + ticketId);
+                    
 
-                // If ticket is not in openTicketList, treat as new ticket
+                // If ticket updated is not in openTicketList
                 } else {
-                    System.out.println("Ticket " + ticketId + " is NOT in openTicketList. Treating as new ticket.");
+                    System.out.println("This event is NOT a mew ticket. Treat as new ticket or an update event");
                     openTicketList.add(ticketId);
 
                     System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
@@ -185,15 +194,20 @@ public class ConnectwiseController {
                     slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion());
 
                     System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
+                    System.out.println("__________________________________________________________________"); // Separator for logs
                     return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
                 }
 
+            } else {
+                System.out.println("Failed to fetch ticket " + ticketId);
+                return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
             }
+        } else {
+            System.out.println("Ignoring event from ticket: " + ticketId + " (not from list of companies)");
         }
 
+        System.out.println("__________________________________________________________________"); // Separator for logs
         return ResponseEntity.ok("Received");
-
-
 
     }
     
