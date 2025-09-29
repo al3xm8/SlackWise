@@ -1,0 +1,126 @@
+{
+    "id": 155496,
+    "company": {
+        "id": 19300,
+        "identifier": "FI Consulting Corporate",
+        "name": "FI Consulting",
+        "_info": {
+            "company_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//company/companies/19300",
+            "mobileGuid": "9809b29b-3912-4186-98ce-5026f7906967"
+        }
+    },
+    "companyType": "Client",
+    "chargeToId": 353540,
+    "chargeToType": "ServiceTicket",
+    "member": {
+        "id": 200,
+        "identifier": "amatos",
+        "name": "Alex Matos",
+        "dailyCapacity": 0.0,
+        "_info": {
+            "member_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//system/members/200",
+            "image_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//system/members/200/image?lm=2025-08-25T20:14:16Z"
+        }
+    },
+    "locationId": 11,
+    "businessUnitId": 1,
+    "businessGroupDesc": "Help Desk",
+    "location": {
+        "id": 11,
+        "name": "Thinksocially LLC",
+        "_info": {
+            "location_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//system/locations/11"
+        }
+    },
+    "department": {
+        "id": 1,
+        "name": "Help Desk",
+        "_info": {
+            "department_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//system/departments/1"
+        }
+    },
+    "workType": {
+        "id": 3,
+        "name": "Regular",
+        "utilizationFlag": true,
+        "_info": {
+            "workType_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//time/workTypes/3"
+        }
+    },
+    "workRole": {
+        "id": 14,
+        "name": "Help Desk:Remote",
+        "_info": {
+            "workRole_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//time/workRoles/14"
+        }
+    },
+    "agreement": {
+        "id": 4,
+        "name": "Quarterly Contract",
+        "type": "Block Time - Recurring",
+        "chargeFirmFlag": false,
+        "_info": {
+            "agreement_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//finance/agreements/4",
+            "typeId": "14"
+        }
+    },
+    "agreementType": "Block Time - Recurring",
+    "territory": "Thinksocially LLC",
+    "timeStart": "2025-09-29T14:45:00Z",
+    "timeEnd": "2025-09-29T14:54:00Z",
+    "hoursDeduct": 0.00,
+    "actualHours": 0.15,
+    "billableOption": "Billable",
+    "notes": "Great! Let me know if you run into any issues and I will be more than happy to help.",
+    "addToDetailDescriptionFlag": true,
+    "addToInternalAnalysisFlag": false,
+    "addToResolutionFlag": true,
+    "emailResourceFlag": true,
+    "emailContactFlag": true,
+    "emailCcFlag": true,
+    "emailCc": "tfemenella@ficonsulting.com;psinha@ficonsulting.com;jason.delano@aderas.com;Laura.Killoran@aderas.com;eastman@ficonsulting.com;",
+    "hourlyCost": "0.00",
+    "enteredBy": "amatos",
+    "dateEntered": "2025-09-29T14:46:16Z",
+    "mobileGuid": "94abbf42-fb63-47cd-bb41-e33d33250ccf",
+    "agreementAmount": 0.00,
+    "agreementAdjustment": 0.00,
+    "adjustment": 0.00,
+    "invoiceReady": 0,
+    "timeSheet": {
+        "id": 7397,
+        "name": "2025-09-28 to 2025-10-04",
+        "_info": {
+            "timeSheet_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//time/sheets/7397"
+        }
+    },
+    "status": "Open",
+    "ticket": {
+        "id": 353540,
+        "summary": "Need help ",
+        "_info": {
+            "ticket_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//service/tickets/353540",
+            "billingMethod": "A",
+            "status": "In Progress"
+        }
+    },
+    "ticketBoard": "Help Desk",
+    "ticketStatus": "In Progress",
+    "ticketType": "Email",
+    "ticketSubType": "Access",
+    "invoiceFlag": true,
+    "extendedInvoiceAmount": 31.250000,
+    "locationName": "Thinksocially LLC",
+    "taxCode": {
+        "id": 8,
+        "name": "Tax-State",
+        "_info": {
+            "taxCode_href": "https://api-na.myconnectwise.net/v4_6_release/apis/3.0//finance/taxCodes/8"
+        }
+    },
+    "_info": {
+        "lastUpdated": "2025-09-29T14:46:16Z",
+        "updatedBy": "amatos",
+        "chargeToMobileGuid": "fcb6f26a-4f67-4fb4-8ab1-0e7c6dc0cac0"
+    }
+}

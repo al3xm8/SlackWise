@@ -15,7 +15,7 @@ public class TimeEntry {
 
     private String chargeToType;
     
-    private String note;
+    private String notes;
     
     private String timeStart;
     
@@ -33,6 +33,12 @@ public class TimeEntry {
     
     @JsonProperty("addToResolutionFlag")
     private boolean resolutionFlag;
+
+    private boolean emailResourceFlag;
+
+    private boolean emailContactFlag;
+    
+    private boolean emailCcFlag;
     
     @JsonProperty("member")
     private Member member;
@@ -73,12 +79,12 @@ public class TimeEntry {
         this.chargeToType = chargeToType;
     }
 
-    public String getNote() {
-        return note;
+    public String getNotes() {
+        return notes;
     }
 
-    public void setNote(String notes) {
-        this.note = notes;
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public String getTimeStart() {
@@ -113,16 +119,36 @@ public class TimeEntry {
         this.hoursDeduct = hoursDeduct;
     }
 
+    public boolean isEmailResourceFlag () {
+        return emailResourceFlag;
+    }
+
+    public void setEmailResourceFlag(boolean emailResourceFlag) {
+        this.emailResourceFlag = emailResourceFlag;
+    }
+
+    public boolean isEmailContactFlag () {
+        return emailResourceFlag;
+    }
+
+    public void setEmailContactFlag (boolean emailContactFlag) {
+        this.emailContactFlag = emailContactFlag;
+    }
+
+    public boolean isEmailCcFlag () {
+        return emailCcFlag;
+    }
+
+    public void setEmailCcFlag (boolean emailCcFlag) {
+        this.emailCcFlag = emailCcFlag;
+    }
+
     public boolean isDetailDescriptionFlag() {
         return detailDescriptionFlag;
     }
 
     public void setDetailDescriptionFlag(boolean detailDescriptionFlag) {
         this.detailDescriptionFlag = detailDescriptionFlag;
-    }
-
-    public boolean getdeailedDescriptionFlag() {
-        return detailDescriptionFlag;
     }
 
     public boolean isInternalAnalysisFlag() {

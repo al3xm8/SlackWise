@@ -1,5 +1,6 @@
 package com.slackwise.slackwise.controller;
 
+import java.io.IOException;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,18 +21,20 @@ public class SlackController {
     AmazonService amazonService;
 
     @Autowired
-    ConnectwiseService ticketService;
+    ConnectwiseService connectwiseService;
 
     /**
      * Handles incoming Slack events, including URL verification challenges.
      *
      * @param payload The incoming request payload from Slack.
      * @return A ResponseEntity containing the challenge response or a simple "OK" message.
+     * @throws InterruptedException 
+     * @throws IOException 
      */
     @PostMapping("/events")
-    public ResponseEntity<String> handleSlackEvents(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<String> handleSlackEvents(@RequestBody Map<String, Object> payload) throws IOException, InterruptedException {
 
-        //System.out.println("Received Slack event: " + payload);
+        System.out.println("Received Slack event");
 
         // Check if this is the initial URL verification challenge
         if ("url_verification".equals(payload.get("type"))) {
@@ -49,7 +52,7 @@ public class SlackController {
                 return ResponseEntity.ok("Ignored subtype");
             }
             if (event != null && event.containsKey("bot_id")) {
-                System.out.println("Ignoring bot event: " + event);
+                System.out.println("Ignoring bot event");
                 return ResponseEntity.ok("Ignored bot event");
             }
 
@@ -60,18 +63,29 @@ public class SlackController {
                 String threadTs = event.get("thread_ts") != null ? String.valueOf(event.get("thread_ts")) : null;
                 String ts = event.get("ts") != null ? String.valueOf(event.get("ts")) : null;
 
-                String ticketNumber = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
+                String ticketId = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
                 // Ignore Slack messages created by this app that use the Note-ID/Ticket-ID prefix
-                if (text != null && (text.startsWith("Note-ID:") || text.startsWith("Ticket-ID:"))) {
+                if (text != null && (text.startsWith("🆔"))) {
                     System.out.println("Ignoring app-generated Slack message: " + text);
                     return ResponseEntity.ok("Ignored app-generated message");
                 }
-                if (ticketNumber != null) {
-                    System.out.println("Message in thread for ticket " + ticketNumber + ": " + text + " from user " + user);
-                    ticketService.addSlackReplyToTicket(ticketNumber, text, event);
+                if (ticketId != null) {
+                    System.out.println("Message in thread for ticket " + ticketId + ": " + text + " from user " + user);
+
+                    // Process the Slack reply asynchronously to avoid blocking the response to Slack (ACK quikckly)
+                    new Thread(() -> {
+                        try {
+                            connectwiseService.addSlackReplyToTicket(ticketId, text, event);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+
                 } else {
                     System.out.println("No ticket found for thread_ts: " + threadTs + " or ts: " + ts);
                 }
+                // Return immediately after scheduling async work to ensure Slack receives a quick 200 OK
+                return ResponseEntity.ok("OK");
             }
         }
 
