@@ -1,7 +1,7 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,17 +18,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.slackwise.slackwise.model.Contact;
-import com.slackwise.slackwise.model.Note;
+
 import com.slackwise.slackwise.model.Ticket;
-import com.slackwise.slackwise.model.TimeEntry;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.methods.SlackApiException;
-
 import jakarta.annotation.PostConstruct;
-import software.amazon.awssdk.services.dynamodb.endpoints.internal.Value.Str;
+
 
 
 @RestController

@@ -63,18 +63,29 @@ public class SlackController {
                 String threadTs = event.get("thread_ts") != null ? String.valueOf(event.get("thread_ts")) : null;
                 String ts = event.get("ts") != null ? String.valueOf(event.get("ts")) : null;
 
-                String ticketNumber = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
+                String ticketId = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
                 // Ignore Slack messages created by this app that use the Note-ID/Ticket-ID prefix
                 if (text != null && (text.startsWith("🆔"))) {
                     System.out.println("Ignoring app-generated Slack message: " + text);
                     return ResponseEntity.ok("Ignored app-generated message");
                 }
-                if (ticketNumber != null) {
-                    System.out.println("Message in thread for ticket " + ticketNumber + ": " + text + " from user " + user);
-                    connectwiseService.addSlackReplyToTicket(ticketNumber, text, event);
+                if (ticketId != null) {
+                    System.out.println("Message in thread for ticket " + ticketId + ": " + text + " from user " + user);
+
+                    // Process the Slack reply asynchronously to avoid blocking the response to Slack (ACK quikckly)
+                    new Thread(() -> {
+                        try {
+                            connectwiseService.addSlackReplyToTicket(ticketId, text, event);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+
                 } else {
                     System.out.println("No ticket found for thread_ts: " + threadTs + " or ts: " + ts);
                 }
+                // Return immediately after scheduling async work to ensure Slack receives a quick 200 OK
+                return ResponseEntity.ok("OK");
             }
         }
 

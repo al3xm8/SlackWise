@@ -150,11 +150,46 @@ public class SlackService {
             // Only post if this note ID hasn't been posted yet
             if (!postedNoteIds.contains(noteIdStr)) {
                 try {
-                    // TODO: Parse the text for picure links and add them to the bot response
+                    // Extract image URLs from note text
+                    List<String> imageUrls = new ArrayList<>();
+                    List<LayoutBlock> blocks = new ArrayList<>();
+
+                    String noteText = note.getText();
+                    // Matches ![[image]](http://...) or ![ ](http://...) with URL length between 62 and 150 chars
+                    Pattern imgUrlPattern = Pattern.compile("(!\\[\\\\\\[image\\\\\\]\\]|!\\[ \\])\\((https:\\/\\/na.myconnectwise.net\\/v4_6_release\\/api\\/newinlineimages\\/[a-z : \\/ . 0-9 _ -]{70,130})\\)");
+                    Matcher imgMatcher = imgUrlPattern.matcher(noteText);
+
+                    while (imgMatcher.find()) {
+                        imageUrls.add(imgMatcher.group(2));
+                    }
+
+                    String cleanedText = imgUrlPattern.matcher(noteText).replaceAll("").trim();
+                    
+                    blocks.add(SectionBlock.builder()
+                        .text(MarkdownTextObject.builder()
+                            .text("🆔 " + note.getId() + "\n👤 " + contactName + "\n\n" + cleanedText)
+                            .build())
+                        .build());
+                         
+                    for (String url : imageUrls) {
+                        blocks.add(ImageBlock.builder()
+                            .imageUrl(url)
+                            .altText("attachment")
+                            .build());
+                    }
+
+                    // Add separator at the very end
+                    blocks.add(SectionBlock.builder()
+                        .text(MarkdownTextObject.builder()
+                            .text("\n__________________________________")
+                            .build())
+                        .build());
+                                        
+                    System.out.println("Cleaned text: " + cleanedText);
 
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
-                            .text("🆔" + note.getId() + "\n👤 " + contactName + "\n\n" + note.getText() + "\n_________________________________")
+                            .blocks(blocks)
                             .threadTs(tsThread)
                     );
 

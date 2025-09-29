@@ -119,7 +119,7 @@ public class TimeEntry {
         this.hoursDeduct = hoursDeduct;
     }
 
-    public boolean getEmailResourceFlag () {
+    public boolean isEmailResourceFlag () {
         return emailResourceFlag;
     }
 
@@ -127,7 +127,7 @@ public class TimeEntry {
         this.emailResourceFlag = emailResourceFlag;
     }
 
-    public boolean getEmailContactFlag () {
+    public boolean isEmailContactFlag () {
         return emailResourceFlag;
     }
 
@@ -135,7 +135,7 @@ public class TimeEntry {
         this.emailContactFlag = emailContactFlag;
     }
 
-    public boolean getEmailCcFlag () {
+    public boolean isEmailCcFlag () {
         return emailCcFlag;
     }
 

@@ -10,7 +10,9 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
@@ -43,6 +45,8 @@ public class ConnectwiseService {
 
     @Value("${client.id}")
     private String clientId;
+
+    private DateTimeFormatter PAYLOAD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneId.of("UTC"));
 
 
     // Base URL for ConnectWise API
@@ -309,7 +313,7 @@ public class ConnectwiseService {
     }
 
     /**
-     * Adds or updates a ticket item in DynamoDB with notes and Slack thread timestamp.
+     * Adds a Slack reply as a note or time entry to the specified ConnectWise ticket.
      * 
      * @param ticketId
      * @param text
@@ -318,17 +322,18 @@ public class ConnectwiseService {
      * @throws IOException 
      */
     public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
-        // Create a Note object for the reply
-        // TODO: configure timeStart, timeEnd, and info parameters correctly
-        // TODO: make send as TimeEntry work
 
-        if (text.startsWith("#actualHours=")) {
+        if (text.startsWith("#actualhours=") || text.startsWith("#actualHours=")) {
 
             System.out.println("Reply being processed as TimeEntry: " + text);
 
-            Pattern pattern = Pattern.compile("^#actualHours=(\\d+(?:\\.\\d+)?)(.*)$");
+            Pattern pattern = Pattern.compile("^#actualhours=(\\d+(?:\\.\\d+)?)(.*)$");
             Matcher matcher = pattern.matcher(text);
 
+            Pattern pattern2 = Pattern.compile("^#actualHours=(\\d+(?:\\.\\d+)?)(.*)$");
+            Matcher matcher2 = pattern2.matcher(text);
+
+            // If the text matches the expected format, extract hours and description
             if (matcher.find()) {
                 
                 double hours = Double.parseDouble(matcher.group(1));
@@ -338,17 +343,17 @@ public class ConnectwiseService {
                 TimeEntry timeEntry = new TimeEntry();
                 timeEntry.setTicketId(Integer.parseInt(ticketId));
                 timeEntry.setNotes(description);
-                timeEntry.setDetailDescriptionFlag(false);
+                timeEntry.setDetailDescriptionFlag(true);
                 timeEntry.setInternalAnalysisFlag(false);
                 timeEntry.setResolutionFlag(false);
-                timeEntry.setTimeStart(null);
+                timeEntry.setTimeStart(getCurrentTimeForPayload());
                 timeEntry.setTimeEnd(null);
                 timeEntry.setInfo(null);
                 // modified in the user commands
                 timeEntry.setActualHours(String.valueOf(hours));
-                timeEntry.setEmailCcFlag(false);
-                timeEntry.setEmailContactFlag(false);
-                timeEntry.setEmailResourceFlag(false);
+                //timeEntry.setEmailCcFlag(false);
+                //timeEntry.setEmailContactFlag(true);
+                //timeEntry.setEmailResourceFlag(false);
 
                 String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
 
@@ -371,11 +376,54 @@ public class ConnectwiseService {
                 }
 
             }
+            
+            else if (matcher2.find()) {
+                double hours = Double.parseDouble(matcher.group(1));
+                String description = matcher.group(2);
+                System.out.println("Matched hours to " + hours + ", Matched description to " + description + "...");
 
+                TimeEntry timeEntry = new TimeEntry();
+                timeEntry.setTicketId(Integer.parseInt(ticketId));
+                timeEntry.setNotes(description);
+                timeEntry.setDetailDescriptionFlag(true);
+                timeEntry.setInternalAnalysisFlag(false);
+                timeEntry.setResolutionFlag(false);
+                timeEntry.setTimeStart(getCurrentTimeForPayload());
+                timeEntry.setTimeEnd(null);
+                timeEntry.setInfo(null);
+                // modified in the user commands
+                timeEntry.setActualHours(String.valueOf(hours));
+                //timeEntry.setEmailCcFlag(false);
+                //timeEntry.setEmailContactFlag(true);
+                //timeEntry.setEmailResourceFlag(false);
+
+                String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
+
+                String jsonResponse = addTimeEntryToTicket(companyId, ticketId, timeEntry);
+                ObjectMapper mapper = new ObjectMapper();
+
+                TimeEntry created = mapper.readValue(jsonResponse, TimeEntry.class);
+
+                try {
+                    if (created != null) {
+                        // Save ConnectWise ticket id and the Slack thread ts in DynamoDB so updateTicketThread won't repost it
+                        amazonService.addNoteToTicket(ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
+                        System.out.println("Added ConnectWise Ticket ID " + created.getTimeEntryId() + " for ticket " + ticketId + " linked to Slack ts " + slackTs);
+                        System.out.println("#" + ticketId + " - " + "Ticket text:\n" + timeEntry.getNotes());
+                    }
+                } catch (Exception e) {
+                    // If parsing fails, fallback to saving the Slack client_msg_id if available
+                    String timeEntryId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
+                    amazonService.addNoteToTicket(ticketId, timeEntryId, slackTs);
+                }
+            } 
+            
+            // User inserted the actualHours command incorrectly
             else {
-                System.out.println("Text did not map to regex correctly...");
+                System.out.println("Text did not map to regex correctly... (actualHours command incorrectly formatted)");
             }
-
+        
+        // Else, process as a regular note
         } else {
 
             System.out.println("Reply being processed as Note:\n" + text);
@@ -419,32 +467,47 @@ public class ConnectwiseService {
         }
     }
 
+    /**
+     * Get the current time in ISO 8601 format for payloads.
+     * @return current time as ISO 8601 string
+     */
+    private String getCurrentTimeForPayload() {
+
+        ZonedDateTime localTime = ZonedDateTime.now(ZoneId.of("America/New_York"));
+        Instant utcInstant = localTime.toInstant();
+        return PAYLOAD_FORMATTER.format(utcInstant);
+
+    }
+
     private String addTimeEntryToTicket(String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
-        // TODO Auto-generated method stub
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
 
+        Ticket ticket = fetchTicketById(companyId2, ticketId);
+
+        payload.put("company", ticket.getCompany());
+        payload.put("companyType", "Client");
         payload.put("chargeToId", ticketId);
-        payload.put("notes", timeEntry.getNotes());
-        payload.put("timeStart", timeEntry.getTimeStart());
-        payload.put("timeEnd", timeEntry.getTimeEnd());
+        payload.put("chargeToType", "ServiceTicket");
+        payload.put("member", timeEntry.getMember());
+        payload.put("agreementType", "Block Time - Recurring");
+        payload.put("territory", "Thinksocially LLC");
+        payload.put("billableOption", "Billable");
         payload.put("actualHours", timeEntry.getActualHours());
-        payload.put("hoursDeduct", timeEntry.getHoursDeduct());
+        payload.put("timeStart", getCurrentTimeForPayload());
+        payload.put("notes", timeEntry.getNotes());
         payload.put("addToDetailDescriptionFlag", timeEntry.isDetailDescriptionFlag());
         payload.put("addToInternalAnalysisFlag", timeEntry.isInternalAnalysisFlag());
         payload.put("addToResolutionFlag", timeEntry.isResolutionFlag());
-        payload.put("emailResourceFlag", timeEntry.getEmailResourceFlag());
-        payload.put("emailContactFlag", timeEntry.getEmailContactFlag());
-        payload.put("emailCcFlag", timeEntry.getEmailCcFlag());
-        payload.put("member", timeEntry.getMember());
-        payload.put("dateEntered", timeEntry.getDateEntered());
-        payload.put("ticketBoard", timeEntry.getTicketBoard());
-        payload.put("ticketStatus", timeEntry.getTicketStatus());
+        payload.put("emailResourceFlag", timeEntry.isEmailResourceFlag());
+        payload.put("emailContactFlag", timeEntry.isEmailContactFlag());
+        payload.put("emailCcFlag", timeEntry.isEmailCcFlag());
 
+        System.out.println("Time in payload: " + payload.get("timeStart"));
         // Prepare to send the request to ConnectWise API
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writeValueAsString(payload);
 
-        String endpoint = "time/entries/" + ticketId + "/notes";
+        String endpoint = "/time/entries";
 
         // Send the HTTP POST request to create the time entry
         HttpRequest request = HttpRequest.newBuilder()
@@ -468,7 +531,7 @@ public class ConnectwiseService {
      * @param companyId2
      * @param ticketId
      * @param note
-     * @return
+     * @return the created note as JSON string
      * @throws IOException
      * @throws InterruptedException
      */
