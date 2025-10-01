@@ -102,6 +102,7 @@ public class ConnectwiseController {
 
         // avoids race conition when creating a new ticket
         if (payload.get("Action") == "updated") {
+            System.out.println("Waiting 5 seconds on updated thread...");
             Thread thread = new Thread();
             thread.wait(5000); // Wait 5 seconds to allow ConnectWise to finalize ticket updates
         }
