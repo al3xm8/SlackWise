@@ -8,10 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -229,12 +227,10 @@ public class ConnectwiseService {
 
         // Populate the ticket's time entries, notes, and discussion
         ticket.setTimeEntries(fetchTimeEntriesByTicketId(ticketId));
-        //System.out.println(ticket.printTimeEntries());
         ticket.setNotes(fetchNotesByTicketId(ticketId));
-        //System.out.println(ticket.printNotes());
         ticket.setDiscussion(ticket.getDiscussion());
 
-        System.out.println("Ticket "+ ticketId + "discussion:\n" + ticket.printDiscussion());
+        //System.out.println("Ticket "+ ticketId + " discussion:\n" + ticket.printDiscussion());
         System.out.println("Ticket fetched.");
 
         return ticket;
@@ -268,6 +264,7 @@ public class ConnectwiseService {
 
         Note note = fetchNoteByNoteTicketId(ticketId, String.valueOf(noteId));
 
+        // This is the case when the note was converted from a time entry
         if (note.getContact() == null) {
             return note.getMember().getName();
         }
@@ -467,9 +464,8 @@ public class ConnectwiseService {
         }
     }
 
-    /**
+    /*
      * Get the current time in ISO 8601 format for payloads.
-     * @return current time as ISO 8601 string
      */
     private String getCurrentTimeForPayload() {
 
@@ -479,6 +475,16 @@ public class ConnectwiseService {
 
     }
 
+    /**
+     * Add a time entry to a specific ticket.
+     * 
+     * @param companyId2
+     * @param ticketId
+     * @param timeEntry
+     * @return the created time entry as JSON string
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private String addTimeEntryToTicket(String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
 

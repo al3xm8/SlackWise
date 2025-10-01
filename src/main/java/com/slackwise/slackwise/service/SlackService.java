@@ -23,9 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
-import java.util.random.RandomGenerator;
 import java.util.regex.Pattern;
 
 @Service
@@ -155,8 +153,9 @@ public class SlackService {
                     List<LayoutBlock> blocks = new ArrayList<>();
 
                     String noteText = note.getText();
-                    // Matches ![[image]](http://...) or ![ ](http://...) with URL length between 62 and 150 chars
-                    Pattern imgUrlPattern = Pattern.compile("(!\\[\\\\\\[image\\\\\\]\\]|!\\[ \\])\\((https:\\/\\/na.myconnectwise.net\\/v4_6_release\\/api\\/newinlineimages\\/[a-z : \\/ . 0-9 _ -]{70,130})\\)");
+                    // Matches https link associated with picttures inside the sender's text
+                    //https://regex101.com/r/r7kZ0H/1
+                    Pattern imgUrlPattern = Pattern.compile("\\**(!\\[\\\\\\[image\\\\\\]\\]|!\\[ \\])\\((https:\\/\\/na.myconnectwise.net\\/v4_6_release\\/api\\/[a-z 0-9 \\/ -]{50,150})\\)\\**");
                     Matcher imgMatcher = imgUrlPattern.matcher(noteText);
 
                     while (imgMatcher.find()) {
