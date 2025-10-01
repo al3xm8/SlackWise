@@ -186,7 +186,7 @@ public class ConnectwiseController {
 
                 // If ticket updated is not in openTicketList
                 } else {
-                    System.out.println("This event is NOT a mew ticket. Treat as new ticket or an update event");
+                    System.out.println("This event is NOT a new ticket. Treat as an update event");
                     openTicketList.add(ticketId);
 
                     System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());

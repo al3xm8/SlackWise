@@ -1,6 +1,7 @@
 package com.slackwise.slackwise.service;
 
 import com.slackwise.slackwise.model.Note;
+import com.slackwise.slackwise.model.Ticket;
 
 import java.util.regex.Matcher;
 
@@ -65,13 +66,23 @@ public class SlackService {
             return null;
         }
 
-        // Get the contact name for new ticket
-        String contactName = connectwiseService.getContactNameByTicketId(ticketId);
+        // Get the contact name for a new ticket
+        String contactName = "N\\A";
+        if (connectwiseService.getContactNameByTicketId(ticketId) == null) {
+            Ticket ticket = connectwiseService.fetchTicketById("", ticketId);
+            if (ticket.getContact() != null) {
+                contactName = connectwiseService.getContactNameByTicketId(ticketId);
+            }
+        } else {
+            contactName = connectwiseService.getContactNameByTicketId(ticketId);
+        }
+
+        final String finalContactName = contactName;  
 
         // Post to Slack
         ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                 .channel(slackChannelId)
-                .text("🆔" + ticketId + "\n👤" + contactName + "\n📝: " + summary)
+                .text("🆔" + ticketId + "\n👤" + finalContactName + "\n📝: " + summary)
         );
 
         if (!response.isOk()) {
