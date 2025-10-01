@@ -348,9 +348,9 @@ public class ConnectwiseService {
                 timeEntry.setInfo(null);
                 // modified in the user commands
                 timeEntry.setActualHours(String.valueOf(hours));
-                //timeEntry.setEmailCcFlag(false);
-                //timeEntry.setEmailContactFlag(true);
-                //timeEntry.setEmailResourceFlag(false);
+                timeEntry.setEmailCcFlag(false);
+                timeEntry.setEmailContactFlag(true);
+                timeEntry.setEmailResourceFlag(true);
 
                 String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
 
@@ -390,9 +390,9 @@ public class ConnectwiseService {
                 timeEntry.setInfo(null);
                 // modified in the user commands
                 timeEntry.setActualHours(String.valueOf(hours));
-                //timeEntry.setEmailCcFlag(false);
-                //timeEntry.setEmailContactFlag(true);
-                //timeEntry.setEmailResourceFlag(false);
+                timeEntry.setEmailCcFlag(false);
+                timeEntry.setEmailContactFlag(true);
+                timeEntry.setEmailResourceFlag(true);
 
                 String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
 
@@ -495,10 +495,8 @@ public class ConnectwiseService {
         payload.put("chargeToId", ticketId);
         payload.put("chargeToType", "ServiceTicket");
         payload.put("member", timeEntry.getMember());
-        payload.put("agreementType", "Block Time - Recurring");
-        payload.put("territory", "Thinksocially LLC");
         payload.put("billableOption", "Billable");
-        payload.put("actualHours", timeEntry.getActualHours());
+        payload.put("actualHours", Double.valueOf(timeEntry.getActualHours()));
         payload.put("timeStart", getCurrentTimeForPayload());
         payload.put("notes", timeEntry.getNotes());
         payload.put("addToDetailDescriptionFlag", timeEntry.isDetailDescriptionFlag());
@@ -507,8 +505,9 @@ public class ConnectwiseService {
         payload.put("emailResourceFlag", timeEntry.isEmailResourceFlag());
         payload.put("emailContactFlag", timeEntry.isEmailContactFlag());
         payload.put("emailCcFlag", timeEntry.isEmailCcFlag());
+        // ensure ConnectWise processes notifications for this entry
+        payload.put("invoiceReady", 1);
 
-        System.out.println("Time in payload: " + payload.get("timeStart"));
         // Prepare to send the request to ConnectWise API
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writeValueAsString(payload);

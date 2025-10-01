@@ -128,7 +128,7 @@ public class TimeEntry {
     }
 
     public boolean isEmailContactFlag () {
-        return emailResourceFlag;
+        return emailContactFlag;
     }
 
     public void setEmailContactFlag (boolean emailContactFlag) {
@@ -208,13 +208,10 @@ public class TimeEntry {
     }
 
     public int getMemberId() {
-        // TODO Auto-generated method stub
         return this.member.getId();
     }
 
-    public String getMemberName() {
-        // TODO Auto-generated method stub
-        
+    public String getMemberName() {        
         return this.member.getName();
     }
 
