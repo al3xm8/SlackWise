@@ -46,7 +46,7 @@ public class SlackService {
     private ConnectwiseService connectwiseService;
 
      /**
-     * Handle posting a NEW ticket to Slack.
+     * Handles posting a NEW ticket to Slack.
      * 
      * @param ticketId
      * @param summary
@@ -59,7 +59,6 @@ public class SlackService {
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
-
         if (amazonService.createTicketItem(ticketId, "") == false) {
             // Ticket item already exists, so another process has already posted the Slack message.
             System.out.println("Ticket item already exists for ticketId: " + ticketId + ", skipping Slack post.");
@@ -82,6 +81,8 @@ public class SlackService {
 
         String postedTs = response.getTs();
 
+        // Attempt to set the thread_ts in DynamoDB. If this fails, it means another process
+        // has already set it, so we delete the duplicate Slack message we just posted.
         if (!amazonService.setThreadTs(ticketId, postedTs)) {
             slack.methods(slackBotToken).chatDelete(req -> req
                     .channel(slackChannelId)
@@ -92,6 +93,7 @@ public class SlackService {
             return null;
         }
 
+        // Update the ticket item with the posted thread_ts
         amazonService.updateThreadTs(ticketId, postedTs);
 
         return response;
@@ -162,14 +164,16 @@ public class SlackService {
                         imageUrls.add(imgMatcher.group(2));
                     }
 
+                    // Clean the note text by removing image markdown syntax
                     String cleanedText = imgUrlPattern.matcher(noteText).replaceAll("").trim();
                     
+                    /// Add the note text section
                     blocks.add(SectionBlock.builder()
                         .text(MarkdownTextObject.builder()
                             .text("🆔 " + note.getId() + "\n👤 " + contactName + "\n\n" + cleanedText)
                             .build())
                         .build());
-                         
+                    // Add image blocks for each extracted URL
                     for (String url : imageUrls) {
                         blocks.add(ImageBlock.builder()
                             .imageUrl(url)

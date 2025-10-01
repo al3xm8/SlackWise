@@ -100,6 +100,11 @@ public class ConnectwiseController {
     @PostMapping("/events")
     public ResponseEntity<String> onNewEvent(@RequestParam("recordId") String recordId,@RequestBody Map<String, Object> payload) throws IOException, InterruptedException, SlackApiException {
 
+        // avoids race conition when creating a new ticket
+        if (payload.get("Action") == "updated") {
+            Thread thread = new Thread();
+            thread.wait(5000); // Wait 5 seconds to allow ConnectWise to finalize ticket updates
+        }
         System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
 
         ObjectMapper mapper = new ObjectMapper();
@@ -135,7 +140,7 @@ public class ConnectwiseController {
             }
 
             if (entity == null) {
-                System.out.println("Entity is null (Ticket has not been changed). Skipping processing for ticket ID: " + recordId);
+                System.out.println("Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
                 System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No Entity found in payload");
             }

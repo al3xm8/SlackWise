@@ -39,6 +39,7 @@ public class SlackController {
         // Check if this is the initial URL verification challenge
         if ("url_verification".equals(payload.get("type"))) {
             System.out.println("Slack challenge received!");
+            System.out.println("__________________________________________________________________"); // Separator for logs
             return ResponseEntity.ok((String) payload.get("challenge"));
         }
 
@@ -53,6 +54,7 @@ public class SlackController {
             }
             if (event != null && event.containsKey("bot_id")) {
                 System.out.println("Ignoring bot event");
+                System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.ok("Ignored bot event");
             }
 
