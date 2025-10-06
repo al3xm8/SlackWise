@@ -328,7 +328,7 @@ public class ConnectwiseService {
 
         if (matcher.find()) {
 
-            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId);
+            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " WITH commands");
 
             TimeEntry timeEntry = new TimeEntry();
 
@@ -371,6 +371,49 @@ public class ConnectwiseService {
 
         } else {
 
+            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " without commands");
+
+            TimeEntry timeEntry = new TimeEntry();
+
+            timeEntry.setTicketId(Integer.parseInt(ticketId));
+            timeEntry.setDetailDescriptionFlag(true);
+            timeEntry.setInternalAnalysisFlag(false);
+            timeEntry.setResolutionFlag(false);
+            timeEntry.setTimeStart(getCurrentTimeForPayload());
+            timeEntry.setTimeEnd(null);
+            timeEntry.setInfo(null);
+            timeEntry.setActualHours(String.valueOf(0.15));
+            timeEntry.setEmailCcFlag(false);
+            timeEntry.setEmailContactFlag(true);
+            timeEntry.setEmailResourceFlag(true);
+
+
+            String description = commandPattern.matcher(text).replaceAll("").trim();
+            timeEntry.setNotes(description);
+
+            String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
+            String jsonResponse = addTimeEntryToTicket(companyId, ticketId, timeEntry);
+            ObjectMapper mapper = new ObjectMapper();
+
+            TimeEntry created = mapper.readValue(jsonResponse, TimeEntry.class);
+
+            try {
+                if (created != null) {
+                    // Save ConnectWise ticket id and the Slack thread ts in DynamoDB so updateTicketThread won't repost it
+                    amazonService.addNoteToTicket(ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
+                    System.out.println("Added ConnectWise Ticket ID " + created.getTimeEntryId() + " for ticket " + ticketId + " linked to Slack ts " + slackTs);
+                    System.out.println("#" + ticketId + " - " + "Ticket text:\n" + timeEntry.getNotes());
+                }
+            } catch (Exception e) {
+                // If parsing fails, fallback to saving the Slack client_msg_id if available
+                String timeEntryId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
+                amazonService.addNoteToTicket(ticketId, timeEntryId, slackTs);
+            }
+
+            /**
+             * Notes have minimal value compared to time entries as they dont log hours worked
+             * Therefore removing the ability to add notes from Slack replies
+             * 
             System.out.println("Reply beind added as a note: " + text + " to ticket " + ticketId);
 
             Note note = new Note();
@@ -406,6 +449,7 @@ public class ConnectwiseService {
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
+            */
         }
     }
 
