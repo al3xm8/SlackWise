@@ -118,8 +118,9 @@ public class SlackService {
      * @return list of Slack responses for each posted note
      * @throws InterruptedException 
      * @throws IOException 
+     * @throws SlackApiException 
      */
-    public List<ChatPostMessageResponse> updateTicketThread(String ticketId, List<Note> discussion) throws IOException, InterruptedException {
+    public List<ChatPostMessageResponse> updateTicketThread(String ticketId, List<Note> discussion, String summary) throws IOException, InterruptedException, SlackApiException {
 
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
@@ -134,6 +135,23 @@ public class SlackService {
         // If Dynamo lookup fails, log and continue to attempt posting (fail open)
         String tsThread = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
 
+        // If we don't have a thread_ts, post a new top-level message first
+        // This can happen if the initial ticket creation event failed to post to Slack
+        // or if we missed that event entirely.
+        // If posting the new ticket fails, abort the note posting. Don't want to spam Slack.
+        if (tsThread == null) {
+            System.out.println("No thread_ts found for ticket " + ticketId + ". Posting ticket to slack channel.");
+            postNewTicket(ticketId, summary);
+            ticket = amazonService.getTicket(ticketId);
+
+            String tsThread2 = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
+            if (tsThread2 == null) {
+                System.out.println("Failed to retrieve thread_ts after posting new ticket for ticket " + ticketId + ". Aborting note posting.");
+                return null;
+            }
+        }
+
+        
         // Keep track of already posted note IDs to avoid duplicates
         // If ticket or notes are null, postedNoteIds will remain empty
         Set<String> postedNoteIds = new HashSet<>();
@@ -146,11 +164,6 @@ public class SlackService {
                     postedNoteIds.add(av.m().get("noteId").s());
                 }
             }
-        }
-
-        // If we don't have a thread_ts, log and post as top-level message
-        if (tsThread == null) {
-            System.out.println("No thread_ts found for ticket " + ticketId + ". Posting as top-level message.");
         }
 
         // Post each note that hasn't been posted yet

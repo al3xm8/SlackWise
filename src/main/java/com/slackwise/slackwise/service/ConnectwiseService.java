@@ -7,16 +7,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
+
 import java.nio.charset.StandardCharsets;
-import java.sql.Time;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -469,8 +470,9 @@ public class ConnectwiseService {
             // Makes it an internal time entry
             } else if (command.equals("internal")) {
                 timeEntry.setInternalAnalysisFlag(true);
+                timeEntry.setEmailContactFlag(false);
                 timeEntry.setDetailDescriptionFlag(false);
-                System.out.println("Set internal analysis flag to true");
+                System.out.println("Set internal analysis flag to true and email contact flag to false");
                 
             } else if (command.equals("resolution")) {
                 timeEntry.setResolutionFlag(true);
