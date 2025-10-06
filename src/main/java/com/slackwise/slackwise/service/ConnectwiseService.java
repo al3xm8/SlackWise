@@ -322,8 +322,8 @@ public class ConnectwiseService {
      */
     public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
 
-        // https://regex101.com/r/hO7LMR/1
-        Pattern commandPattern = Pattern.compile("\\$([\\w]+)=?([\\d.]+)?\"?([\\w@.;]+;)?\"?");
+        //https://regex101.com/r/VXBKry/2
+        Pattern commandPattern = Pattern.compile("\\$([\\w]+)=?([\\d.]+)?\"?(?:<mailto:)?([a-z@.\\d]+.com)?\\|?(?:[a-z@.\\d]+.com)?>?\"?");
         Matcher matcher = commandPattern.matcher(text);
 
         if (matcher.find()) {
@@ -443,7 +443,7 @@ public class ConnectwiseService {
                 System.out.println("Set email CC flag to true");
 
             } else if (command.equals("cc") || command.equals("Cc")) {
-                timeEntry.setCc(matcher.group(2));
+                timeEntry.setCc(matcher.group(3));
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set CC to " + matcher.group(3) + " and email CC flag to true");
 
@@ -494,6 +494,7 @@ public class ConnectwiseService {
         payload.put("emailResourceFlag", timeEntry.isEmailResourceFlag());
         payload.put("emailContactFlag", timeEntry.isEmailContactFlag());
         payload.put("emailCcFlag", timeEntry.isEmailCcFlag());
+        payload.put("emailCc", timeEntry.getCc());
         // ensure ConnectWise processes notifications for this entry
         payload.put("invoiceReady", 1);
 
