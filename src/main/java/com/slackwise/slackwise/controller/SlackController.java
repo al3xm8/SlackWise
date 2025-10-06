@@ -48,7 +48,7 @@ public class SlackController {
             String eventType = event != null ? (String) event.get("type") : null;
 
             // Ignore messages with a subtype (edits, deletions, etc.) and bot messages to avoid loops
-            if (event != null && event.get("subtype") != null) {
+            if (event != null && (event.get("subtype") != null && !event.get("subtype").equals("file_share"))) {
                 System.out.println("Ignoring event with subtype: " + event.get("subtype"));
                 return ResponseEntity.ok("Ignored subtype");
             }
