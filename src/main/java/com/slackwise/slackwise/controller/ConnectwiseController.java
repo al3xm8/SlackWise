@@ -182,16 +182,23 @@ public class ConnectwiseController {
                 // If ticketFetch successful
                 if (ticket != null) {
 
-                    System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
-                    slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
+                    // Only process if action is "added" or "updated"
+                    if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
-                    System.out.println("Updating Slack Thread for new ticket " + ticketId);
-                    slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
+                        System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
+                        slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
 
-                    System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
-                    System.out.println("__________________________________________________________________"); // Separator for logs
-                    return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
-                    
+                        System.out.println("Updating Slack Thread for new ticket " + ticketId);
+                        slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
+
+                        System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
+                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
+                    } else {
+                        System.out.println("Ignoring ConnectWise event action: " + payload.get("Action"));
+                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        return ResponseEntity.ok("Ignored event action: " + payload.get("Action"));
+                    }
 
                 } else {
                     System.out.println("Failed to fetch ticket " + ticketId);

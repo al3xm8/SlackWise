@@ -83,6 +83,7 @@ public class SlackService {
         ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                 .channel(slackChannelId)
                 .text("🆔" + ticketId + "\n👤" + finalContactName + "\n📝: " + summary)
+                .mrkdwn(true)
         );
 
         if (!response.isOk()) {
@@ -196,6 +197,7 @@ public class SlackService {
                         .text(MarkdownTextObject.builder()
                             .text("🆔 " + note.getId() + "\n👤 " + contactName + "\n\n" + cleanedText)
                             .build())
+                            .mrkdwn(true)
                         .build());
                     // Add image blocks for each extracted URL
                     for (String url : imageUrls) {
