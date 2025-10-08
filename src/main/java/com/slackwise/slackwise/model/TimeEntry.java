@@ -39,6 +39,8 @@ public class TimeEntry {
     private boolean emailContactFlag;
     
     private boolean emailCcFlag;
+
+    private String cc;
     
     @JsonProperty("member")
     private Member member;
@@ -213,6 +215,14 @@ public class TimeEntry {
 
     public String getMemberName() {        
         return this.member.getName();
+    }
+
+    public String getCc() {
+        return cc;
+    }
+
+    public void setCc(String cc) {
+        this.cc = cc;
     }
 
 

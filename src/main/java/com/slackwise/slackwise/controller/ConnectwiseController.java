@@ -39,7 +39,12 @@ public class ConnectwiseController {
     SlackService slackService;
 
     private ArrayList<String> companies = new ArrayList<String>();
+    
+    // Depreceated: now using database to track which tickets have been posted to Slack
     private Set<Integer> openTicketList = new HashSet<>();
+
+    // add a simple lock object to serialize onNewEvent() calls
+    private final Object eventLock = new Object();
 
     
 
@@ -100,117 +105,112 @@ public class ConnectwiseController {
     @PostMapping("/events")
     public ResponseEntity<String> onNewEvent(@RequestParam("recordId") String recordId,@RequestBody Map<String, Object> payload) throws IOException, InterruptedException, SlackApiException {
 
-        // avoids race conition when creating a new ticket
-        if (payload.get("Action") == "updated") {
-            Thread thread = new Thread();
-            thread.wait(5000); // Wait 5 seconds to allow ConnectWise to finalize ticket updates
-        }
-        System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
+        synchronized (eventLock) {
+            // avoids race conition when creating a new ticket
+            if (payload.get("Action").equals("updated")) {
+                System.out.println("Waiting 5 seconds on updated thread...");
+                try {
+                    // Sleep current thread for 5 seconds
+                    Thread.sleep(5000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
 
-        ObjectMapper mapper = new ObjectMapper();
+            ObjectMapper mapper = new ObjectMapper();
 
-        /*
-            Get ticket ID from payload
-        */ 
-        Integer ticketId = -1;
+            /*
+                Get ticket ID from payload
+            */ 
+            Integer ticketId = -1;
 
-        if (payload.containsKey("ID")) {
-            ticketId = Integer.valueOf(String.valueOf(payload.get("ID")));
-            System.out.println("Extracted ticket ID: " + ticketId);
-        } else  {
-            System.out.println("No ticket ID found in payload");
-            System.out.println("__________________________________________________________________"); // Separator for logs
-            return ResponseEntity.badRequest().body("No ticket ID found in payload");
-        }
-
-        /*
-            Get entity and companyId from payload
-        */
-        String entityJson = "";
-        String companyId = "";
-
-        if (payload.containsKey("Entity")) {
-            entityJson = String.valueOf(payload.get("Entity"));
-
-            // Parse entity JSON string into a Map
-            Map<String, Object> entity = null;
-            if (entityJson != null && !"null".equals(entityJson)) {
-                entity = mapper.readValue(entityJson, Map.class);
-                System.out.println("Extracted entity from payload");
+            if (payload.containsKey("ID")) {
+                ticketId = Integer.valueOf(String.valueOf(payload.get("ID")));
+                System.out.println("Extracted ticket ID: " + ticketId);
+            } else  {
+                System.out.println("No ticket ID found in payload");
+                System.out.println("__________________________________________________________________"); // Separator for logs
+                return ResponseEntity.badRequest().body("No ticket ID found in payload");
             }
 
-            if (entity == null) {
-                System.out.println("Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
+            /*
+                Get entity and companyId from payload
+            */
+            String entityJson = "";
+            String companyId = "";
+
+            if (payload.containsKey("Entity")) {
+                entityJson = String.valueOf(payload.get("Entity"));
+
+                // Parse entity JSON string into a Map
+                Map<String, Object> entity = null;
+                if (entityJson != null && !"null".equals(entityJson)) {
+                    entity = mapper.readValue(entityJson, Map.class);
+                    System.out.println("Extracted entity from payload");
+                }
+
+                if (entity == null) {
+                    System.out.println("Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
+                    System.out.println("__________________________________________________________________"); // Separator for logs
+                    return ResponseEntity.badRequest().body("No Entity found in payload");
+                }
+
+                // Extract companyId
+                Map<String, Object> company = (Map<String, Object>) entity.get("company");
+                
+                if (company != null && company.get("id") != null) {
+                    companyId = String.valueOf(company.get("id"));
+                    System.out.println("Extracted companyId: " + companyId);
+                }
+
+            } else {
+                System.out.println("No Entity found in payload. (This is likely not a ticket.)");
+                System.out.println(payload);
                 System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No Entity found in payload");
             }
 
-            // Extract companyId
-            Map<String, Object> company = (Map<String, Object>) entity.get("company");
+            /*
+                Process ticket from payload
+            */
             
-            if (company != null && company.get("id") != null) {
-                companyId = String.valueOf(company.get("id"));
-                System.out.println("Extracted companyId: " + companyId);
-            }
+            // Only process if the companyId is in our list of companies to track
+            if (companies.contains(companyId)) {
+                Ticket ticket = connectwiseService.fetchTicketById(companyId, ticketId.toString());
 
-        } else {
-            System.out.println("No Entity found in payload. (This is likely not a ticket.)");
-            System.out.println(payload);
-            System.out.println("__________________________________________________________________"); // Separator for logs
-            return ResponseEntity.badRequest().body("No Entity found in payload");
-        }
+                // If ticketFetch successful
+                if (ticket != null) {
 
-        /*
-            Process ticket from payload
-        */
-        
-        // Only process if the companyId is in our list of companies to track
-        if (companies.contains(companyId)) {
-            Ticket ticket = connectwiseService.fetchTicketById(companyId, ticketId.toString());
+                    // Only process if action is "added" or "updated"
+                    if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
-            // If ticketFetch successful
-            if (ticket != null) {
+                        System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
+                        slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
 
-                // If ticket is already in openTicketList, treat as update
-                if (openTicketList.contains(ticketId) && payload.get("Action") == "updated") {
-                    System.out.println("Ticket " + ticketId + " is already in openTicketList.");
+                        System.out.println("Updating Slack Thread for new ticket " + ticketId);
+                        slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
 
-                    System.out.println("Updating Slack thread for ticket: " + ticketId);
-                    slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion());
-                    System.out.println("Thread updated.");
+                        System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
+                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
+                    } else {
+                        System.out.println("Ignoring ConnectWise event action: " + payload.get("Action"));
+                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        return ResponseEntity.ok("Ignored event action: " + payload.get("Action"));
+                    }
 
-                    System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
-                    System.out.println("__________________________________________________________________"); // Separator for logs
-                    return ResponseEntity.ok("Processed update event for ticketId: " + ticketId);
-                    
-
-                // If ticket updated is not in openTicketList
                 } else {
-                    System.out.println("This event is NOT a new ticket. Treat as an update event");
-                    openTicketList.add(ticketId);
-
-                    System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
-                    slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
-
-                    System.out.println("Updating Slack Thread for new ticket " + ticketId);
-                    slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion());
-
-                    System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
-                    System.out.println("__________________________________________________________________"); // Separator for logs
-                    return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
+                    System.out.println("Failed to fetch ticket " + ticketId);
+                    return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
                 }
-
             } else {
-                System.out.println("Failed to fetch ticket " + ticketId);
-                return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
+                System.out.println("Ignoring event from ticket: " + ticketId + " (not from list of companies)");
             }
-        } else {
-            System.out.println("Ignoring event from ticket: " + ticketId + " (not from list of companies)");
+
+            System.out.println("__________________________________________________________________"); // Separator for logs
+            return ResponseEntity.ok("Received");
         }
-
-        System.out.println("__________________________________________________________________"); // Separator for logs
-        return ResponseEntity.ok("Received");
-
     }
     
     

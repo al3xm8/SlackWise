@@ -183,6 +183,7 @@ public class AmazonService {
 
             System.out.println("Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
             return true;
+            
         // If condition fails (item with ticketId already exists), return false
         } catch (ConditionalCheckFailedException e) {
             return false;
