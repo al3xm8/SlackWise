@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.methods.SlackApiException;
 import jakarta.annotation.PostConstruct;
@@ -58,16 +59,6 @@ public class ConnectwiseController {
         companies.add("19300"); // Test company ID, add more if you want to track multiple companies
         companies.add("250");
 
-        try {
-            // Replace with your actual company ID if needed
-            for (String companyId : companies) {
-                List<Ticket> tickets = getOpenTicketsByCompanyId((String)companyId);
-                System.out.println("Initialized with " + tickets.size() + " open tickets for company ID: " + companyId);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            connectwiseService.tickets = null;
-        }
     }
 
     
@@ -106,16 +97,7 @@ public class ConnectwiseController {
     public ResponseEntity<String> onNewEvent(@RequestParam("recordId") String recordId,@RequestBody Map<String, Object> payload) throws IOException, InterruptedException, SlackApiException {
 
         synchronized (eventLock) {
-            // avoids race conition when creating a new ticket
-            if (payload.get("Action").equals("updated")) {
-                System.out.println("Waiting 5 seconds on updated thread...");
-                try {
-                    // Sleep current thread for 5 seconds
-                    Thread.sleep(5000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            
             System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
 
             ObjectMapper mapper = new ObjectMapper();
@@ -146,7 +128,7 @@ public class ConnectwiseController {
                 // Parse entity JSON string into a Map
                 Map<String, Object> entity = null;
                 if (entityJson != null && !"null".equals(entityJson)) {
-                    entity = mapper.readValue(entityJson, Map.class);
+                    entity = mapper.readValue(entityJson, new TypeReference<Map<String, Object>>() {});
                     System.out.println("Extracted entity from payload");
                 }
 
@@ -157,6 +139,7 @@ public class ConnectwiseController {
                 }
 
                 // Extract companyId
+                @SuppressWarnings("unchecked")
                 Map<String, Object> company = (Map<String, Object>) entity.get("company");
                 
                 if (company != null && company.get("id") != null) {
