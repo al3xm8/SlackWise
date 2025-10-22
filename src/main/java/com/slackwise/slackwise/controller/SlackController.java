@@ -44,6 +44,7 @@ public class SlackController {
         }
 
         if (payload.containsKey("event")) {
+            @SuppressWarnings("unchecked")
             Map<String, Object> event = (Map<String, Object>) payload.get("event");
             String eventType = event != null ? (String) event.get("type") : null;
 
@@ -54,7 +55,6 @@ public class SlackController {
             }
             if (event != null && event.containsKey("bot_id")) {
                 System.out.println("Ignoring bot event");
-                System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.ok("Ignored bot event");
             }
 
