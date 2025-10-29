@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-
+import com.slackwise.slackwise.model.Tenant;
 import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
@@ -39,6 +39,8 @@ public class ConnectwiseController {
     @Autowired
     SlackService slackService;
 
+    Tenant tenant;
+
     private ArrayList<String> companies = new ArrayList<String>();
     
     // Depreceated: now using database to track which tickets have been posted to Slack
@@ -58,7 +60,6 @@ public class ConnectwiseController {
 
         companies.add("19300"); // Test company ID, add more if you want to track multiple companies
         companies.add("250");
-
     }
 
     
@@ -101,6 +102,22 @@ public class ConnectwiseController {
             System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
 
             ObjectMapper mapper = new ObjectMapper();
+
+            /*
+              
+              Get tenantId from payload
+             
+              */
+
+            if (!payload.containsKey("CompanyId")) {
+                System.out.println("No CompanyId found in payload");
+                System.out.println("__________________________________________________________________"); // Separator for logs
+                return ResponseEntity.badRequest().body("No CompanyId found in payload");
+            }
+
+            tenant = new Tenant(String.valueOf(payload.get("CompanyId"))); 
+            slackService.tenant = tenant;
+            System.out.println("Extracted tenant ID: " + tenant.getTenantId());
 
             /*
                 Get ticket ID from payload

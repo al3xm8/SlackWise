@@ -1,6 +1,7 @@
 package com.slackwise.slackwise.service;
 
 import com.slackwise.slackwise.model.Note;
+import com.slackwise.slackwise.model.Tenant;
 import com.slackwise.slackwise.model.Ticket;
 
 import java.util.regex.Matcher;
@@ -46,6 +47,8 @@ public class SlackService {
     @Autowired
     private ConnectwiseService connectwiseService;
 
+    public Tenant tenant;
+
      /**
      * Handles posting a NEW ticket to Slack.
      * 
@@ -57,6 +60,8 @@ public class SlackService {
      * @throws InterruptedException 
      */
     public ChatPostMessageResponse postNewTicket(String ticketId, String summary) throws IOException, SlackApiException, InterruptedException {
+
+        amazonService.tenant = tenant;
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
@@ -126,9 +131,6 @@ public class SlackService {
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
         List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
-
-        // Delay in case of concurrent events (avoids race conditions)
-        Thread.sleep(500);
 
         // Fetch thread_ts and posted notes from DynamoDB
         Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
