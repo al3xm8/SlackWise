@@ -323,8 +323,15 @@ public class ConnectwiseService {
      */
     public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
 
-        //https://regex101.com/r/VXBKry/2
-        Pattern commandPattern = Pattern.compile("\\$([\\w]+)=?([\\d.]+)?\"?(?:<mailto:)?([a-z@.\\d]+.com)?\\|?(?:[a-z@.\\d]+.com)?>?\"?");
+        //https://regex101.com/r/VXBKry/5
+        Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?((?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|([\\w\\d@.]+)(?:[>\\n" + //
+                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+))?");
+
         Matcher matcher = commandPattern.matcher(text);
 
         if (matcher.find()) {
@@ -487,9 +494,18 @@ public class ConnectwiseService {
             } else if (command.equals("emailCc") || command.equals("emailcc")) {
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set email CC flag to true");
-
+            
+                // Sets the CC email addresses for the time entry (only up to 3 emails supported)
             } else if (command.equals("cc") || command.equals("Cc")) {
-                timeEntry.setCc(matcher.group(3));
+
+                if (matcher.group(9) != null) {
+                    timeEntry.setCc(matcher.group(9));
+                } else if (matcher.group(7) != null) {
+                    timeEntry.setCc(matcher.group(7) + ";" + matcher.group(8));
+                } else if (matcher.group(4) != null) {
+                    timeEntry.setCc(matcher.group(4) + ";" + matcher.group(5) + ";" + matcher.group(6));
+                }
+                
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set CC to " + matcher.group(3) + " and email CC flag to true");
 
