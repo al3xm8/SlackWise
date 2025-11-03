@@ -323,7 +323,7 @@ public class ConnectwiseService {
      */
     public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
 
-        //https://regex101.com/r/VXBKry/5
+        //https://regex101.com/r/6uC4Tj/1
         Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?((?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
                         "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
                         "]+)(?:<mailto:[\\w\\d@.]+)?\\|([\\w\\d@.]+)(?:[>\\n" + //
@@ -336,7 +336,7 @@ public class ConnectwiseService {
 
         if (matcher.find()) {
 
-            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " WITH commands");
+            System.out.println("Reply being added as a time entry to ticket " + ticketId + " WITH commands");
 
             TimeEntry timeEntry = new TimeEntry();
 
@@ -379,7 +379,7 @@ public class ConnectwiseService {
 
         } else {
 
-            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " without commands");
+            System.out.println("Reply being added as a time entry to ticket " + ticketId + " without commands");
 
             TimeEntry timeEntry = new TimeEntry();
 
