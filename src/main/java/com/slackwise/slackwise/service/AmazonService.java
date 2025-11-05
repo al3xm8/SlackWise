@@ -1,5 +1,6 @@
 package com.slackwise.slackwise.service;
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -189,7 +190,7 @@ public class AmazonService {
                 .conditionExpression("attribute_not_exists(ticketId)") // Only put if ticketId does not exist
                 .build());
 
-            System.out.println("Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
+            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
             return true;
             
         // If condition fails (item with ticketId already exists), return false

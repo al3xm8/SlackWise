@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +130,7 @@ public class ConnectwiseService {
         String conditions = URLEncoder.encode("chargeToId=" + ticketId, StandardCharsets.UTF_8);
         String fields = URLEncoder.encode("id,company,chargeToId,chargeToType,member,timeStart,timeEnd,actualHours,notes,addToDetailDescriptionFlag,addToInternalAnalysisFlag,addToResolutionFlag,emailCcFlag,emailCc,dateEntered,ticket,ticketBoard,ticketStatus,_info", StandardCharsets.UTF_8);
 
-        System.out.println("Fetching ticket time entries for ticket " + ticketId);
+        //System.out.println("Fetching ticket time entries for ticket " + ticketId);
 
         String endpoint = "/time/entries";
         // Send the HTTP GET request to fetch time entries for the ticket
@@ -169,7 +169,7 @@ public class ConnectwiseService {
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId + "/notes";
 
-        System.out.println("Fetching notes for ticket " + ticketId);
+       //System.out.println("Fetching notes for ticket " + ticketId);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + endpoint))
@@ -207,7 +207,7 @@ public class ConnectwiseService {
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId;
 
-        System.out.println("Fetching ticket ID " + ticketId);
+        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Fetching ticket ID " + ticketId);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + endpoint))
@@ -234,7 +234,7 @@ public class ConnectwiseService {
         ticket.setDiscussion(ticket.getDiscussion());
 
         //System.out.println("Ticket "+ ticketId + " discussion:\n" + ticket.printDiscussion());
-        System.out.println("Ticket fetched.");
+        //System.out.println("Ticket fetched.");
 
         return ticket;
     }
@@ -464,10 +464,12 @@ public class ConnectwiseService {
     private void parseCommands(TimeEntry timeEntry, Matcher matcher) {        
         while (matcher.find()) {
             String command = matcher.group(1);
-
+            
+            /*
             for (int i = 0; i < matcher.groupCount(); i++) {
                 System.out.println("Group " + i + ": " + matcher.group(i));
             }
+            */
 
             // Process each command accordingly
             // Sets the actual hours for the time entry

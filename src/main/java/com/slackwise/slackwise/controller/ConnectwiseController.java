@@ -1,7 +1,7 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
-
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -99,7 +99,7 @@ public class ConnectwiseController {
 
         synchronized (eventLock) {
             
-            System.out.println("Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
+            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
 
             ObjectMapper mapper = new ObjectMapper();
 
@@ -110,14 +110,14 @@ public class ConnectwiseController {
               */
 
             if (!payload.containsKey("CompanyId")) {
-                System.out.println("No CompanyId found in payload");
+                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No CompanyId found in payload");
                 System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No CompanyId found in payload");
             }
 
             tenant = new Tenant(String.valueOf(payload.get("CompanyId"))); 
             slackService.tenant = tenant;
-            System.out.println("Extracted tenant ID: " + tenant.getTenantId());
+            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted tenant ID: " + tenant.getTenantId());
 
             /*
                 Get ticket ID from payload
@@ -126,9 +126,9 @@ public class ConnectwiseController {
 
             if (payload.containsKey("ID")) {
                 ticketId = Integer.valueOf(String.valueOf(payload.get("ID")));
-                System.out.println("Extracted ticket ID: " + ticketId);
+                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted ticket ID: " + ticketId);
             } else  {
-                System.out.println("No ticket ID found in payload");
+                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No ticket ID found in payload");
                 System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No ticket ID found in payload");
             }
@@ -146,11 +146,11 @@ public class ConnectwiseController {
                 Map<String, Object> entity = null;
                 if (entityJson != null && !"null".equals(entityJson)) {
                     entity = mapper.readValue(entityJson, new TypeReference<Map<String, Object>>() {});
-                    System.out.println("Extracted entity from payload");
+                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted entity from payload");
                 }
 
                 if (entity == null) {
-                    System.out.println("Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
+                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
                     System.out.println("__________________________________________________________________"); // Separator for logs
                     return ResponseEntity.badRequest().body("No Entity found in payload");
                 }
@@ -161,11 +161,11 @@ public class ConnectwiseController {
                 
                 if (company != null && company.get("id") != null) {
                     companyId = String.valueOf(company.get("id"));
-                    System.out.println("Extracted companyId: " + companyId);
+                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted companyId: " + companyId);
                 }
 
             } else {
-                System.out.println("No Entity found in payload. (This is likely not a ticket.)");
+                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No Entity found in payload. (This is likely not a ticket.)");
                 System.out.println(payload);
                 System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.badRequest().body("No Entity found in payload");
@@ -185,27 +185,27 @@ public class ConnectwiseController {
                     // Only process if action is "added" or "updated"
                     if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
-                        System.out.println("Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
+                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
                         slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
 
-                        System.out.println("Updating Slack Thread for new ticket " + ticketId);
+                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Updating Slack Thread for new ticket " + ticketId);
                         slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
 
-                        System.out.println("Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
+                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
                         System.out.println("__________________________________________________________________"); // Separator for logs
                         return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
                     } else {
-                        System.out.println("Ignoring ConnectWise event action: " + payload.get("Action"));
+                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ignoring ConnectWise event action: " + payload.get("Action"));
                         System.out.println("__________________________________________________________________"); // Separator for logs
                         return ResponseEntity.ok("Ignored event action: " + payload.get("Action"));
                     }
 
                 } else {
-                    System.out.println("Failed to fetch ticket " + ticketId);
+                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Failed to fetch ticket " + ticketId);
                     return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
                 }
             } else {
-                System.out.println("Ignoring event from ticket: " + ticketId + " (not from list of companies)");
+                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ignoring event from ticket: " + ticketId + " (not from list of companies)");
             }
 
             System.out.println("__________________________________________________________________"); // Separator for logs
