@@ -46,6 +46,13 @@ public class ConnectwiseService {
 
     @Value("${client.id}")
     private String clientId;
+    
+    @Value("${user.id}")
+    private int userId;
+    
+    @Value("${user.identifier}")
+    private String userIdentifier;
+    
 
     private DateTimeFormatter PAYLOAD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneId.of("UTC"));
 
@@ -461,7 +468,7 @@ public class ConnectwiseService {
         }
     }
 
-    private void parseCommands(TimeEntry timeEntry, Matcher matcher) {        
+    private void parseCommands(TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException {        
         while (matcher.find()) {
             String command = matcher.group(1);
             
@@ -510,7 +517,38 @@ public class ConnectwiseService {
                 
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set CC to " + matcher.group(3) + " and email CC flag to true");
+            
+            } else if (command.equals("am")) {
+                Ticket ticket = fetchTicketById(companyId, String.valueOf(timeEntry.getTicketId()));
 
+                // Build JSON Patch operations
+                List<Map<String, Object>> ops = new java.util.ArrayList<>();
+
+                Map<String, Object> ownerVal = new java.util.HashMap<>();
+                ownerVal.put("id", userId);
+                ownerVal.put("identifier", userIdentifier);
+
+                Map<String, Object> ownerOp = new java.util.HashMap<>();
+                ownerOp.put("op", "replace");
+                ownerOp.put("path", "owner"); // or "/owner"
+                ownerOp.put("value", ownerVal);
+                ops.add(ownerOp);
+
+                ObjectMapper mapper = new ObjectMapper();
+                String json = mapper.writeValueAsString(ops);
+
+                String endpoint = "/service/tickets/" + timeEntry.getTicketId();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + endpoint))
+                    .header("Authorization", buildAuthHeader())
+                    .header("clientId", clientId)
+                    .header("Content-Type", "application/json") // try application/json-patch+json if needed
+                    .method("PATCH", BodyPublishers.ofString(json))
+                    .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                System.out.println("Assigned ticket " + timeEntry.getTicketId() + " to user " + userIdentifier);
             } else {
                 System.out.println("Unknown command: " + command);
             }

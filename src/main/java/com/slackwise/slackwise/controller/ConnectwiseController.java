@@ -57,7 +57,6 @@ public class ConnectwiseController {
      */
     @PostConstruct
     public void initTickets() {
-
         companies.add("19300"); // Test company ID, add more if you want to track multiple companies
        //companies.add("250");
     }
