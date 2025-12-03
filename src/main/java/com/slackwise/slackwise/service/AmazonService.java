@@ -1,5 +1,6 @@
 package com.slackwise.slackwise.service;
 
+import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,9 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.slack.api.Slack;
+import com.slack.api.methods.SlackApiException;
+import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slackwise.slackwise.model.Tenant;
 
 import jakarta.annotation.PostConstruct;
@@ -36,6 +40,15 @@ public class AmazonService {
     // DynamoDB table name
     @Value("${aws.dynamodb.table}")
     private String tableName;
+    
+    // Slack configuration properties
+    @Value("${slack.bot.token}")
+    private String slackBotToken;
+
+    @Value("${slack.channel.id}")
+    private String slackChannelId;
+    
+    private final Slack slack = Slack.getInstance();
 
     Tenant tenant;
 
@@ -232,12 +245,25 @@ public class AmazonService {
     }
 
     /**
-     * Get ticketId by looking up the item with matching ts_thread. Returns null if not found.
+     * Get ticketId by looking up the item with matching ts_thread. Returns null if ticketId is not found or tenant is not set.
      * 
      * @param threadTs
      * @return ticketId or null if not found
+     * @throws SlackApiException 
+     * @throws IOException 
      */
-    public String getTicketIdByThreadTs(String threadTs) {
+    public String getTicketIdByThreadTs(String threadTs) throws IOException, SlackApiException {
+        
+        if (tenant == null) {
+            
+            ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
+                .channel(slackChannelId)
+                .text("ERR0R: Tenant not set when trying to getTicketIdByThreadTs for threadTs: " + threadTs)
+                .mrkdwn(true)
+            );         
+            return null;
+        }
+        
         ScanRequest scanRequest = ScanRequest.builder()
             .tableName(tableName)
             .filterExpression("tenantId = :tenant AND ts_thread = :ts")

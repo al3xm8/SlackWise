@@ -5,11 +5,9 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
-
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -25,11 +23,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.slackwise.slackwise.model.TimeEntry;
-import com.slackwise.slackwise.model.Note;
-import com.slackwise.slackwise.model.Ticket;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.api.Slack;
+import com.slack.api.methods.SlackApiException;
+import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slackwise.slackwise.model.Note;
+import com.slackwise.slackwise.model.Ticket;
+import com.slackwise.slackwise.model.TimeEntry;
 
 @Service
 public class ConnectwiseService {
@@ -53,9 +54,16 @@ public class ConnectwiseService {
     @Value("${user.identifier}")
     private String userIdentifier;
     
+    // Slack configuration properties
+    @Value("${slack.bot.token}")
+    private String slackBotToken;
 
+    @Value("${slack.channel.id}")
+    private String slackChannelId;
+    
+    private final Slack slack = Slack.getInstance();
+    
     private DateTimeFormatter PAYLOAD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneId.of("UTC"));
-
 
     // Base URL for ConnectWise API
     private String baseUrl = "https://na.myconnectwise.net/v4_6_release/apis/3.0";
@@ -69,6 +77,8 @@ public class ConnectwiseService {
     @Autowired
     private com.slackwise.slackwise.service.AmazonService amazonService;
 
+
+    
     // Authorization token for ConnectWise API (Base64 encoded "publicKey:privateKey")
     private String buildAuthHeader() {
         String rawAuth = companyId + "+" + publicKey + ":" + privateKey;
@@ -327,17 +337,18 @@ public class ConnectwiseService {
      * @param event
      * @throws InterruptedException 
      * @throws IOException 
+     * @throws SlackApiException 
      */
-    public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
+    public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException, SlackApiException {
 
-        //https://regex101.com/r/6uC4Tj/1
-        Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?((?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
-                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
-                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|([\\w\\d@.]+)(?:[>\\n" + //
-                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
-                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
-                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
-                        "]+))?");
+        //https://regex101.com/r/6uC4Tj/2
+        Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?(([\\w\\d@.]+);\\n" + //
+                        "?([\\w\\d@.]+);\\n" + //
+                        "?([\\w\\d@.]+);?\\n" + //
+                        "?|([\\w\\d@.]+);\\n" + //
+                        "?([\\w\\d@.]+);?\\n" + //
+                        "?|([\\w\\d@.]+);?\\n" + //
+                        "?)?");
 
         Matcher matcher = commandPattern.matcher(text);
 
@@ -360,8 +371,12 @@ public class ConnectwiseService {
             timeEntry.setEmailResourceFlag(true);
 
             matcher.reset();
-            parseCommands(timeEntry, matcher);
-
+            try {
+                parseCommands(timeEntry, matcher);
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
+                return;
+            }
             String description = commandPattern.matcher(text).replaceAll("").trim();
             timeEntry.setNotes(description);
 
@@ -468,7 +483,7 @@ public class ConnectwiseService {
         }
     }
 
-    private void parseCommands(TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException {        
+    private void parseCommands(TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException, SlackApiException {        
         while (matcher.find()) {
             String command = matcher.group(1);
             
@@ -550,7 +565,14 @@ public class ConnectwiseService {
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
                 System.out.println("Assigned ticket " + timeEntry.getTicketId() + " to user " + userIdentifier);
             } else {
-                System.out.println("Unknown command: " + command);
+                
+                ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
+                    .channel(slackChannelId)
+                    .text("ERR0R: The command $" + command + " is not recognized. Supported commands are: $actualHours=<hours>, $internal, $resolution, $ninja, $emailCc, $cc=<email1>;<email2>;<email3>, $am")
+                    .mrkdwn(true)
+                );                
+                
+                throw new IOException("The command $" + command + " is not recognized.");
             }
         }
     }

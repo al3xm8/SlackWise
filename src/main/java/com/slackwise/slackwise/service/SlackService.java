@@ -4,8 +4,6 @@ import com.slackwise.slackwise.model.Note;
 import com.slackwise.slackwise.model.Tenant;
 import com.slackwise.slackwise.model.Ticket;
 
-import java.util.regex.Matcher;
-
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
@@ -28,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @Service
 public class SlackService {
@@ -90,7 +89,7 @@ public class SlackService {
             // Post to Slack
             ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                     .channel(slackChannelId)
-                    .text("🆔" + ticketId + "\n👤" + finalContactName + "\n📝: " + summary)
+                    .text("🆔" + ticketId + "    👤" + finalContactName + "\n📝: " + summary)
                     .mrkdwn(true)
             );
 
@@ -191,12 +190,12 @@ public class SlackService {
 
                     String noteText = note.getText();
                     // Matches https link associated with picttures inside the sender's text
-                    //https://regex101.com/r/r7kZ0H/1
-                    Pattern imgUrlPattern = Pattern.compile("\\**(!\\[\\\\\\[image\\\\\\]\\]|!\\[ \\])\\((https:\\/\\/na.myconnectwise.net\\/v4_6_release\\/api\\/[a-z 0-9 \\/ -]{50,150})\\)\\**");
+                    //https://regex101.com/r/r7kZ0H/2
+                    Pattern imgUrlPattern = Pattern.compile("\\!\\[.*]\\((.*)\\)");
                     Matcher imgMatcher = imgUrlPattern.matcher(noteText);
 
                     while (imgMatcher.find()) {
-                        imageUrls.add(imgMatcher.group(2));
+                        imageUrls.add(imgMatcher.group(1));
                     }
 
                     // Clean the note text by removing image markdown syntax
@@ -205,9 +204,10 @@ public class SlackService {
                     /// Add the note text section
                     blocks.add(SectionBlock.builder()
                         .text(MarkdownTextObject.builder()
-                            .text("🆔 " + note.getId() + "\n👤 " + contactName + "\n\n" + cleanedText)
+                            .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + cleanedText)
                             .build())
                         .build());
+                        
                     // Add image blocks for each extracted URL
                     for (String url : imageUrls) {
                         blocks.add(ImageBlock.builder()
@@ -227,8 +227,10 @@ public class SlackService {
 
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
+                            .text("🆔 " + note.getId() + "   👤 " + contactName)
                             .blocks(blocks)
                             .threadTs(tsThread)
+                            .mrkdwn(true)
                     );
 
                     // If posting failed, log and skip adding to responses

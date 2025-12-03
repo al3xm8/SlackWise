@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.slack.api.methods.SlackApiException;
 import com.slackwise.slackwise.service.AmazonService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 
@@ -31,9 +32,10 @@ public class SlackController {
      * @return A ResponseEntity containing the challenge response or a simple "OK" message.
      * @throws InterruptedException 
      * @throws IOException 
+     * @throws SlackApiException 
      */
     @PostMapping("/events")
-    public ResponseEntity<String> handleSlackEvents(@RequestBody Map<String, Object> payload) throws IOException, InterruptedException {
+    public ResponseEntity<String> handleSlackEvents(@RequestBody Map<String, Object> payload) throws IOException, InterruptedException, SlackApiException {
 
         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Received Slack event");
 
