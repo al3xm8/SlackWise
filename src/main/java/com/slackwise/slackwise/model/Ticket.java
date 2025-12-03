@@ -12,15 +12,19 @@ import java.util.stream.Collectors;
 public class Ticket {
 
     // Fields
-
     private int id;
     private String summary;
     private Board board;
     private Status status;
     private Company company;
     private Contact contact;
+    private Owner owner;
     private String contactPhoneNumber;
+    private Priority priority;
     private String contactEmailAddress;
+    private String severity;
+    private String impact;
+    private Team team;
     private Type type;
     private SubType subType;
     private boolean closedFlag;
@@ -77,6 +81,26 @@ public class Ticket {
         public int id;
         public String name;
     }
+    
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class Owner {
+        public int id;
+        public String identifier;
+    }
+    
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class Priority {
+        public int id;
+        public String name;
+        public int sort;
+        private String level;
+    }
+    
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class Team {
+        public int id;
+        public String name;
+    }
 
     // Getters and Setters
 
@@ -119,6 +143,7 @@ public class Ticket {
     public void setCompany(Company company) {
         this.company = company;
     }
+
 
     public Contact getContact() {
         return contact;
@@ -199,6 +224,48 @@ public class Ticket {
 
     public void setNotes(List<Note> notes) {
         this.notes = notes;
+    }
+    
+    public Owner getOwner() {
+        return owner;
+    }
+    
+    public void setOwner(int id, String identifier) {
+        Owner owner = new Owner();
+        owner.id = id;
+        owner.identifier = identifier;
+    }
+    
+    public void setPriority(Priority priority) {
+        this.priority = priority;
+    }
+    
+    public Priority getPriority() {
+        return priority;
+    }
+    
+    public String getSeverity() {
+        return severity;
+    }
+    
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+    
+    public String getImpact() {
+        return impact;
+    }
+    
+    public void setImpact(String impact) {
+        this.impact = impact;
+    }
+    
+    public Team getTeam() {
+        return team;
+    }
+    
+    public void setTeam(Team team) {
+        this.team = team;
     }
 
     public void setDiscussion(List<Note> discussion) {

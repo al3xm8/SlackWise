@@ -1,11 +1,15 @@
 package com.slackwise.slackwise.service;
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.slackwise.slackwise.model.Tenant;
+
 import jakarta.annotation.PostConstruct;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -32,6 +36,8 @@ public class AmazonService {
     // DynamoDB table name
     @Value("${aws.dynamodb.table}")
     private String tableName;
+
+    Tenant tenant;
 
     // Initialize DynamoDB client
     @PostConstruct
@@ -61,6 +67,7 @@ public class AmazonService {
         
         // Prepare Map to put ticketId and thread ts and link them together
         Map<String, AttributeValue> item = new java.util.HashMap<>();
+        item.put("tenantId", AttributeValue.builder().s(tenant.getTenantId()).build());
         item.put("ticketId", AttributeValue.builder().s(ticketIdStr).build());
         item.put("ts_thread", AttributeValue.builder().s(tsThread).build());
 
@@ -91,7 +98,8 @@ public class AmazonService {
     public Map<String, AttributeValue> getTicket(String ticketId) {
         GetItemResponse response = dynamoDb.getItem(GetItemRequest.builder()
             .tableName(tableName)
-            .key(Map.of("ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build()))
+            .key(Map.of("tenantId", AttributeValue.builder().s(String.valueOf(tenant.getTenantId())).build(),
+                        "ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build()))
             .build());
         // Return the item map directly; it will be EMPTY if the item does not exist
         return response.item();
@@ -170,6 +178,7 @@ public class AmazonService {
         // Prepare Map item to put into DynamoDB
         try {
             Map<String, AttributeValue> item = new java.util.HashMap<>();
+            item.put("tenantId", AttributeValue.builder().s(tenant.getTenantId()).build());
             item.put("ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build());
             item.put("ts_thread", AttributeValue.builder().s(tsThread).build());
             item.put("notes", AttributeValue.builder().l(java.util.List.of()).build());
@@ -181,7 +190,7 @@ public class AmazonService {
                 .conditionExpression("attribute_not_exists(ticketId)") // Only put if ticketId does not exist
                 .build());
 
-            System.out.println("Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
+            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
             return true;
             
         // If condition fails (item with ticketId already exists), return false
@@ -203,7 +212,8 @@ public class AmazonService {
             // update with condition that ts_thread is missing or empty
             UpdateItemRequest req = UpdateItemRequest.builder()
                 .tableName(tableName)
-                .key(Map.of("ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build()))
+                .key(Map.of("tenantId", AttributeValue.builder().s(String.valueOf(tenant.getTenantId())).build(),
+                            "ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build()))
                 .updateExpression("SET ts_thread = :ts")
                 .conditionExpression("attribute_not_exists(ts_thread) OR ts_thread = :empty")
                 .expressionAttributeValues(Map.of(
@@ -228,25 +238,20 @@ public class AmazonService {
      * @return ticketId or null if not found
      */
     public String getTicketIdByThreadTs(String threadTs) {
-        // Scan DynamoDB for item with matching ts_thread
         ScanRequest scanRequest = ScanRequest.builder()
             .tableName(tableName)
-            .filterExpression("ts_thread = :ts")
-            .expressionAttributeValues(Map.of(":ts", AttributeValue.builder().s(threadTs).build()))
+            .filterExpression("tenantId = :tenant AND ts_thread = :ts")
+            .expressionAttributeValues(Map.of(
+                ":tenant", AttributeValue.builder().s(tenant.getTenantId()).build(),
+                ":ts", AttributeValue.builder().s(threadTs).build()
+            ))
             .build();
 
-        // There should be at most one item with a given ts_thread
         ScanResponse response = dynamoDb.scan(scanRequest);
-        if (response.count() > 0 && response.items().size() > 0) {
+        if (!response.items().isEmpty()) {
             Map<String, AttributeValue> item = response.items().get(0);
-            if (item.containsKey("ticketId")) {
-
-                // Return ticketId
-                return item.get("ticketId").s();
-            }
+            return item.get("ticketId").s();
         }
-
-        // Not found
         return null;
     }
 }

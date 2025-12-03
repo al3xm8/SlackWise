@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +46,13 @@ public class ConnectwiseService {
 
     @Value("${client.id}")
     private String clientId;
+    
+    @Value("${user.id}")
+    private int userId;
+    
+    @Value("${user.identifier}")
+    private String userIdentifier;
+    
 
     private DateTimeFormatter PAYLOAD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneId.of("UTC"));
 
@@ -130,7 +137,7 @@ public class ConnectwiseService {
         String conditions = URLEncoder.encode("chargeToId=" + ticketId, StandardCharsets.UTF_8);
         String fields = URLEncoder.encode("id,company,chargeToId,chargeToType,member,timeStart,timeEnd,actualHours,notes,addToDetailDescriptionFlag,addToInternalAnalysisFlag,addToResolutionFlag,emailCcFlag,emailCc,dateEntered,ticket,ticketBoard,ticketStatus,_info", StandardCharsets.UTF_8);
 
-        System.out.println("Fetching ticket time entries for ticket " + ticketId);
+        //System.out.println("Fetching ticket time entries for ticket " + ticketId);
 
         String endpoint = "/time/entries";
         // Send the HTTP GET request to fetch time entries for the ticket
@@ -169,7 +176,7 @@ public class ConnectwiseService {
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId + "/notes";
 
-        System.out.println("Fetching notes for ticket " + ticketId);
+       //System.out.println("Fetching notes for ticket " + ticketId);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + endpoint))
@@ -207,7 +214,7 @@ public class ConnectwiseService {
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId;
 
-        System.out.println("Fetching ticket ID " + ticketId);
+        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Fetching ticket ID " + ticketId);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + endpoint))
@@ -234,7 +241,7 @@ public class ConnectwiseService {
         ticket.setDiscussion(ticket.getDiscussion());
 
         //System.out.println("Ticket "+ ticketId + " discussion:\n" + ticket.printDiscussion());
-        System.out.println("Ticket fetched.");
+        //System.out.println("Ticket fetched.");
 
         return ticket;
     }
@@ -323,13 +330,20 @@ public class ConnectwiseService {
      */
     public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException {
 
-        //https://regex101.com/r/VXBKry/2
-        Pattern commandPattern = Pattern.compile("\\$([\\w]+)=?([\\d.]+)?\"?(?:<mailto:)?([a-z@.\\d]+.com)?\\|?(?:[a-z@.\\d]+.com)?>?\"?");
+        //https://regex101.com/r/6uC4Tj/1
+        Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?((?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|([\\w\\d@.]+)(?:[>\\n" + //
+                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+)|(?:<mailto:[\\w\\d@.]+)?\\|?([\\w\\d@.]+)(?:[>;\\n" + //
+                        "]+))?");
+
         Matcher matcher = commandPattern.matcher(text);
 
         if (matcher.find()) {
 
-            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " WITH commands");
+            System.out.println("Reply being added as a time entry to ticket " + ticketId + " WITH commands");
 
             TimeEntry timeEntry = new TimeEntry();
 
@@ -372,7 +386,7 @@ public class ConnectwiseService {
 
         } else {
 
-            System.out.println("Reply being added as a time entry: " + text + " to ticket " + ticketId + " without commands");
+            System.out.println("Reply being added as a time entry to ticket " + ticketId + " without commands");
 
             TimeEntry timeEntry = new TimeEntry();
 
@@ -454,13 +468,15 @@ public class ConnectwiseService {
         }
     }
 
-    private void parseCommands(TimeEntry timeEntry, Matcher matcher) {        
+    private void parseCommands(TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException {        
         while (matcher.find()) {
             String command = matcher.group(1);
-
+            
+            /*
             for (int i = 0; i < matcher.groupCount(); i++) {
                 System.out.println("Group " + i + ": " + matcher.group(i));
             }
+            */
 
             // Process each command accordingly
             // Sets the actual hours for the time entry
@@ -487,12 +503,52 @@ public class ConnectwiseService {
             } else if (command.equals("emailCc") || command.equals("emailcc")) {
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set email CC flag to true");
-
+            
+                // Sets the CC email addresses for the time entry (only up to 3 emails supported)
             } else if (command.equals("cc") || command.equals("Cc")) {
-                timeEntry.setCc(matcher.group(3));
+
+                if (matcher.group(9) != null) {
+                    timeEntry.setCc(matcher.group(9));
+                } else if (matcher.group(7) != null) {
+                    timeEntry.setCc(matcher.group(7) + ";" + matcher.group(8));
+                } else if (matcher.group(4) != null) {
+                    timeEntry.setCc(matcher.group(4) + ";" + matcher.group(5) + ";" + matcher.group(6));
+                }
+                
                 timeEntry.setEmailCcFlag(true);
                 System.out.println("Set CC to " + matcher.group(3) + " and email CC flag to true");
+            
+            } else if (command.equals("am")) {
+                Ticket ticket = fetchTicketById(companyId, String.valueOf(timeEntry.getTicketId()));
 
+                // Build JSON Patch operations
+                List<Map<String, Object>> ops = new java.util.ArrayList<>();
+
+                Map<String, Object> ownerVal = new java.util.HashMap<>();
+                ownerVal.put("id", userId);
+                ownerVal.put("identifier", userIdentifier);
+
+                Map<String, Object> ownerOp = new java.util.HashMap<>();
+                ownerOp.put("op", "replace");
+                ownerOp.put("path", "owner"); // or "/owner"
+                ownerOp.put("value", ownerVal);
+                ops.add(ownerOp);
+
+                ObjectMapper mapper = new ObjectMapper();
+                String json = mapper.writeValueAsString(ops);
+
+                String endpoint = "/service/tickets/" + timeEntry.getTicketId();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + endpoint))
+                    .header("Authorization", buildAuthHeader())
+                    .header("clientId", clientId)
+                    .header("Content-Type", "application/json") // try application/json-patch+json if needed
+                    .method("PATCH", BodyPublishers.ofString(json))
+                    .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                System.out.println("Assigned ticket " + timeEntry.getTicketId() + " to user " + userIdentifier);
             } else {
                 System.out.println("Unknown command: " + command);
             }

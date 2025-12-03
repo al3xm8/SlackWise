@@ -3,6 +3,7 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 src/main/resources/application.properties
 src/main/resources/templates/time-entry.json
+src/main/resources/Thumbs.db
 !**/src/main/**/target/
 !**/src/test/**/target/
 
