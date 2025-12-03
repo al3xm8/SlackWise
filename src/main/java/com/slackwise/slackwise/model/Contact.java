@@ -40,4 +40,3 @@ public class Contact {
         return this.name;
     }
 }
-
