@@ -1,6 +1,11 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -9,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.slackwise.slackwise.model.Tenant;
 import com.slackwise.slackwise.model.Ticket;
+import com.slackwise.slackwise.model.TimeEntry;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -49,7 +56,17 @@ public class ConnectwiseController {
     // add a simple lock object to serialize onNewEvent() calls
     private final Object eventLock = new Object();
 
+    @Value("${client.id}")
+    private String clientId;
+
+    @Value("${user.id}")
+    private int userId;
     
+    @Value("${user.identifier}")
+    private String userIdentifier;
+    
+    // Base URL for ConnectWise API
+    private String baseUrl = "https://na.myconnectwise.net/v4_6_release/apis/3.0";
 
     /**
      * Initializes the ticket service by fetching all open tickets for a specific company.
@@ -190,8 +207,56 @@ public class ConnectwiseController {
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Updating Slack Thread for new ticket " + ticketId);
                         slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
 
+                        
+                        if (ticket.getOwner() != null) {
+                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is assigned to " + ticket.getOwner().identifier + ".");
+                        } else {
+                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is unassigned.");
+                            
+                            TimeEntry timeEntry = new TimeEntry();
+
+                            timeEntry.setTicketId(ticketId);
+                            timeEntry.setDetailDescriptionFlag(true);
+                            timeEntry.setInternalAnalysisFlag(true);
+                            timeEntry.setResolutionFlag(false);
+                            timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
+                            timeEntry.setActualHours(String.valueOf(0.0));
+                            timeEntry.setNotes("Assigned / Selected Resources. / ");
+
+                            
+                            // Build JSON Patch operations
+                            List<Map<String, Object>> ops = new java.util.ArrayList<>();
+
+                            Map<String, Object> ownerVal = new java.util.HashMap<>();
+                            ownerVal.put("id", userId);
+                            ownerVal.put("identifier", userIdentifier);
+
+                            Map<String, Object> ownerOp = new java.util.HashMap<>();
+                            ownerOp.put("op", "replace");
+                            ownerOp.put("path", "owner"); // or "/owner"
+                            ownerOp.put("value", ownerVal);
+                            ops.add(ownerOp);
+
+                            ObjectMapper mapper2 = new ObjectMapper();
+                            String json = mapper2.writeValueAsString(ops);
+
+                            String endpoint = "/service/tickets/" + timeEntry.getTicketId();
+
+                            HttpRequest request = HttpRequest.newBuilder()
+                                .uri(URI.create(baseUrl + endpoint))
+                                .header("Authorization",connectwiseService.buildAuthHeader())
+                                .header("clientId", clientId)
+                                .header("Content-Type", "application/json") // try application/json-patch+json if needed
+                                .method("PATCH", BodyPublishers.ofString(json))
+                                .build();
+
+                            HttpClient client = HttpClient.newHttpClient();
+                            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                        }
+
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
                         System.out.println("__________________________________________________________________"); // Separator for logs
+
                         return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
                     } else {
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ignoring ConnectWise event action: " + payload.get("Action"));
@@ -211,6 +276,7 @@ public class ConnectwiseController {
             return ResponseEntity.ok("Received");
         }
     }
+    
     
     
 }

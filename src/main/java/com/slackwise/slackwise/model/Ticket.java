@@ -83,7 +83,8 @@ public class Ticket {
     }
     
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class Owner {
+    public
+    static class Owner {
         public int id;
         public String identifier;
     }

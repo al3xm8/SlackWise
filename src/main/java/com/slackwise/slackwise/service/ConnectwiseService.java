@@ -80,7 +80,7 @@ public class ConnectwiseService {
 
     
     // Authorization token for ConnectWise API (Base64 encoded "publicKey:privateKey")
-    private String buildAuthHeader() {
+    public String buildAuthHeader() {
         String rawAuth = companyId + "+" + publicKey + ":" + privateKey;
         String encodedAuth = Base64.getEncoder().encodeToString(rawAuth.getBytes());
         return "Basic " + encodedAuth;
@@ -577,10 +577,12 @@ public class ConnectwiseService {
         }
     }
 
+    
+
     /*
      * Get the current time in ISO 8601 format for payloads.
      */
-    private String getCurrentTimeForPayload() {
+    public String getCurrentTimeForPayload() {
 
         ZonedDateTime localTime = ZonedDateTime.now(ZoneId.of("America/New_York"));
         Instant utcInstant = localTime.toInstant();
