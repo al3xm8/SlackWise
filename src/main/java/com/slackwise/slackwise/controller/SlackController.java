@@ -58,6 +58,7 @@ public class SlackController {
             }
             if (event != null && event.containsKey("bot_id")) {
                 System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Ignoring bot event");
+                System.out.println("__________________________________________________________________"); // Separator for logs
                 return ResponseEntity.ok("Ignored bot event");
             }
 

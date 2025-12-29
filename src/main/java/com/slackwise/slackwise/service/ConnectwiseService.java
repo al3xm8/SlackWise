@@ -536,34 +536,7 @@ public class ConnectwiseService {
             } else if (command.equals("am")) {
                 Ticket ticket = fetchTicketById(companyId, String.valueOf(timeEntry.getTicketId()));
 
-                // Build JSON Patch operations
-                List<Map<String, Object>> ops = new java.util.ArrayList<>();
-
-                Map<String, Object> ownerVal = new java.util.HashMap<>();
-                ownerVal.put("id", userId);
-                ownerVal.put("identifier", userIdentifier);
-
-                Map<String, Object> ownerOp = new java.util.HashMap<>();
-                ownerOp.put("op", "replace");
-                ownerOp.put("path", "owner"); // or "/owner"
-                ownerOp.put("value", ownerVal);
-                ops.add(ownerOp);
-
-                ObjectMapper mapper = new ObjectMapper();
-                String json = mapper.writeValueAsString(ops);
-
-                String endpoint = "/service/tickets/" + timeEntry.getTicketId();
-
-                HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + endpoint))
-                    .header("Authorization", buildAuthHeader())
-                    .header("clientId", clientId)
-                    .header("Content-Type", "application/json") // try application/json-patch+json if needed
-                    .method("PATCH", BodyPublishers.ofString(json))
-                    .build();
-
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                System.out.println("Assigned ticket " + timeEntry.getTicketId() + " to user " + userIdentifier);
+                this.assignTicketTo(userId, userIdentifier, timeEntry.getTicketId());
             } else {
                 
                 ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
@@ -577,19 +550,6 @@ public class ConnectwiseService {
         }
     }
 
-    
-
-    /*
-     * Get the current time in ISO 8601 format for payloads.
-     */
-    public String getCurrentTimeForPayload() {
-
-        ZonedDateTime localTime = ZonedDateTime.now(ZoneId.of("America/New_York"));
-        Instant utcInstant = localTime.toInstant();
-        return PAYLOAD_FORMATTER.format(utcInstant);
-
-    }
-
     /**
      * Add a time entry to a specific ticket.
      * 
@@ -600,7 +560,7 @@ public class ConnectwiseService {
      * @throws IOException
      * @throws InterruptedException
      */
-    private String addTimeEntryToTicket(String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
+    public String addTimeEntryToTicket(String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
 
         Ticket ticket = fetchTicketById(companyId2, ticketId);
@@ -700,6 +660,49 @@ public class ConnectwiseService {
         return jsonResponse;
     }
 
+    /*
+     * Get the current time in ISO 8601 format for payloads.
+     */
+    public String getCurrentTimeForPayload() {
+
+        ZonedDateTime localTime = ZonedDateTime.now(ZoneId.of("America/New_York"));
+        Instant utcInstant = localTime.toInstant();
+        
+        return PAYLOAD_FORMATTER.format(utcInstant);
+
+    }
+
+    public void assignTicketTo(int userId, String userIdentifier, int ticketId) throws IOException, InterruptedException {
+
+        // Build JSON Patch operations
+        List<Map<String, Object>> ops = new java.util.ArrayList<>();
+
+        Map<String, Object> ownerVal = new java.util.HashMap<>();
+        ownerVal.put("id", userId);
+        ownerVal.put("identifier", userIdentifier);
+
+        Map<String, Object> ownerOp = new java.util.HashMap<>();
+        ownerOp.put("op", "replace");
+        ownerOp.put("path", "owner"); // or "/owner"
+        ownerOp.put("value", ownerVal);
+        ops.add(ownerOp);
+
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(ops);
+
+        String endpoint = "/service/tickets/" + ticketId;
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader())
+            .header("clientId", clientId)
+            .header("Content-Type", "application/json") // try application/json-patch+json if needed
+            .method("PATCH", BodyPublishers.ofString(json))
+            .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Assigned ticket " + ticketId + " to user " + userIdentifier);
+    }
     
 
 }

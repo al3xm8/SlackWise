@@ -1,11 +1,7 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpRequest.BodyPublishers;
-import java.net.http.HttpResponse;
+
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -75,7 +71,7 @@ public class ConnectwiseController {
     @PostConstruct
     public void initTickets() {
         companies.add("19300"); // Test company ID, add more if you want to track multiple companies
-       companies.add("250");
+        //companies.add("250");
     }
 
     
@@ -209,49 +205,37 @@ public class ConnectwiseController {
 
                         
                         if (ticket.getOwner() != null) {
-                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is assigned to " + ticket.getOwner().identifier + ".");
+                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is already assigned to " + ticket.getOwner().identifier + ". No assignment needed.");
                         } else {
+                            
                             System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is unassigned.");
                             
-                            TimeEntry timeEntry = new TimeEntry();
+                            if (ticket.getSummary().toLowerCase().contains("fic compliance: set and review") || ticket.getSummary().toLowerCase().contains("info systems audits") || ticket.getSummary().toLowerCase().contains("internal system vulnerability") || ticket.getSummary().toLowerCase().contains("monitor firewall and report") || ticket.getSummary().toLowerCase().contains("routine security check") || ticket.getSummary().toLowerCase().contains("documentation for review of permissions")) {
+                                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " appears to be a ticket opened by team for compliance or internal review. Skipping assignment.");
+                                System.out.println("__________________________________________________________________"); // Separator for logs
+                                return ResponseEntity.ok("Skipped assignment for test ticketId: " + ticketId);
+                                
+                            // Assign ticket to user and add time entry
+                            } else {
+                                TimeEntry timeEntry = new TimeEntry();
 
-                            timeEntry.setTicketId(ticketId);
-                            timeEntry.setDetailDescriptionFlag(true);
-                            timeEntry.setInternalAnalysisFlag(true);
-                            timeEntry.setResolutionFlag(false);
-                            timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
-                            timeEntry.setActualHours(String.valueOf(0.0));
-                            timeEntry.setNotes("Assigned / Selected Resources. / ");
-
-                            
-                            // Build JSON Patch operations
-                            List<Map<String, Object>> ops = new java.util.ArrayList<>();
-
-                            Map<String, Object> ownerVal = new java.util.HashMap<>();
-                            ownerVal.put("id", userId);
-                            ownerVal.put("identifier", userIdentifier);
-
-                            Map<String, Object> ownerOp = new java.util.HashMap<>();
-                            ownerOp.put("op", "replace");
-                            ownerOp.put("path", "owner"); // or "/owner"
-                            ownerOp.put("value", ownerVal);
-                            ops.add(ownerOp);
-
-                            ObjectMapper mapper2 = new ObjectMapper();
-                            String json = mapper2.writeValueAsString(ops);
-
-                            String endpoint = "/service/tickets/" + timeEntry.getTicketId();
-
-                            HttpRequest request = HttpRequest.newBuilder()
-                                .uri(URI.create(baseUrl + endpoint))
-                                .header("Authorization",connectwiseService.buildAuthHeader())
-                                .header("clientId", clientId)
-                                .header("Content-Type", "application/json") // try application/json-patch+json if needed
-                                .method("PATCH", BodyPublishers.ofString(json))
-                                .build();
-
-                            HttpClient client = HttpClient.newHttpClient();
-                            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                                timeEntry.setTicketId(ticketId);
+                                timeEntry.setDetailDescriptionFlag(false);
+                                timeEntry.setInternalAnalysisFlag(true);
+                                timeEntry.setResolutionFlag(false);
+                                timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
+                                timeEntry.setActualHours(String.valueOf(0.0));
+                                timeEntry.setTimeEnd(null);
+                                timeEntry.setInfo(null);
+                                timeEntry.setNotes("Assigned / Selected Resources. / ");
+                                timeEntry.setEmailCcFlag(false);
+                                timeEntry.setEmailContactFlag(false);
+                                timeEntry.setEmailResourceFlag(false);
+                                
+                                
+                                connectwiseService.assignTicketTo(userId, userIdentifier, ticketId);
+                                connectwiseService.addTimeEntryToTicket(companyId, String.valueOf(ticketId), timeEntry);
+                            }
                         }
 
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
