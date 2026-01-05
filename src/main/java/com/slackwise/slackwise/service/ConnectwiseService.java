@@ -672,6 +672,14 @@ public class ConnectwiseService {
 
     }
 
+    /**
+     * Assigns a ticket to a specific user in ConnectWise by updating the ticket's owner field. This method constructs a JSON Patch request to replace the owner information of the specified ticket with the provided user ID and identifier. It then sends a PATCH request to the ConnectWise API to update the ticket accordingly. This is typically used when a user wants to claim a ticket or reassign it to someone else directly from Slack commands or interactions. The method also logs the assignment action for auditing purposes.
+     * @param userId
+     * @param userIdentifier
+     * @param ticketId
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public void assignTicketTo(int userId, String userIdentifier, int ticketId) throws IOException, InterruptedException {
 
         // Build JSON Patch operations
@@ -706,3 +714,5 @@ public class ConnectwiseService {
     
 
 }
+
+// https://regex101.com/r/eqaa9m/1
