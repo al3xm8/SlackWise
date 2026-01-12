@@ -209,21 +209,21 @@ public class ConnectwiseController {
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
                         final int finalTicketId = ticketId;
                         final String finalCompanyId = companyId;
-                        
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
+                        if (payload.get("Action").equals("added")) {
+                            new Thread(() -> {
                                 try {
-                                    Thread.sleep(120000); // Wait for 2 minutes before checking for assignment
-                                    Ticket ticket = connectwiseService.fetchTicketById(finalCompanyId, String.valueOf(finalTicketId));
                                     
-                                    if (ticket.getOwner() != null) {
+                                    Thread.sleep(120000); // Wait for 2 minutes before checking for assignment
+                                    Ticket ticket2 = connectwiseService.fetchTicketById(finalCompanyId, String.valueOf(finalTicketId));
+                                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Re-fetched ticket " + finalTicketId + " after delay to check for assignment");
+
+                                    if (ticket2.getOwner() != null) {
                                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " is already assigned to " + ticket.getOwner().identifier + ". No assignment needed.");
                                     } else {
                                         
                                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " is unassigned.");
                                         
-                                        if (ticket.getSummary().toLowerCase().contains("re:") || ticket.getSummary().toLowerCase().contains("compliance: set and review") || ticket.getSummary().toLowerCase().contains("info systems audits") || ticket.getSummary().toLowerCase().contains("internal system vulnerability") || ticket.getSummary().toLowerCase().contains("monitor firewall and report") || ticket.getSummary().toLowerCase().contains("routine security check") || ticket.getSummary().toLowerCase().contains("documentation for review of permissions") || ticket.getSummary().toLowerCase().contains("compliance") || ticket.getSummary().toLowerCase().contains("audit") || ticket.getContact().equals(leadContactName)) {
+                                        if (ticket2.getSummary().toLowerCase().contains("re:") || ticket2.getSummary().toLowerCase().contains("compliance: set and review") || ticket2.getSummary().toLowerCase().contains("info systems audits") || ticket2.getSummary().toLowerCase().contains("internal system vulnerability") || ticket2.getSummary().toLowerCase().contains("monitor firewall and report") || ticket2.getSummary().toLowerCase().contains("routine security check") || ticket2.getSummary().toLowerCase().contains("documentation for review of permissions") || ticket2.getSummary().toLowerCase().contains("compliance") || ticket2.getSummary().toLowerCase().contains("audit") || ticket2.getContact().equals(leadContactName)) {
                                             System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " appears to be a ticket opened by team for compliance or internal review. Skipping assignment.");
                                             System.out.println("__________________________________________________________________"); // Separator for logs
                                             
@@ -251,40 +251,8 @@ public class ConnectwiseController {
                                 } catch (Exception e) {
                                     e.printStackTrace();
                                 }
-                            }
-                        }).start();
-                        if (ticket.getOwner() != null) {
-                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is already assigned to " + ticket.getOwner().identifier + ". No assignment needed.");
-                        } else {
-                            
-                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " is unassigned.");
-                            
-                            if (ticket.getSummary().toLowerCase().contains("re:") || ticket.getSummary().toLowerCase().contains("fic compliance: set and review") || ticket.getSummary().toLowerCase().contains("info systems audits") || ticket.getSummary().toLowerCase().contains("internal system vulnerability") || ticket.getSummary().toLowerCase().contains("monitor firewall and report") || ticket.getSummary().toLowerCase().contains("routine security check") || ticket.getSummary().toLowerCase().contains("documentation for review of permissions") || ticket.getSummary().toLowerCase().contains("compliance") || ticket.getSummary().toLowerCase().contains("audit") || ticket.getContact().equals(leadContactName)) {
-                                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + ticketId + " appears to be a ticket opened by team for compliance or internal review. Skipping assignment.");
-                                System.out.println("__________________________________________________________________"); // Separator for logs
-                                return ResponseEntity.ok("Skipped assignment for test ticketId: " + ticketId);
                                 
-                            // Assign ticket to user and add time entry
-                            } else {
-                                TimeEntry timeEntry = new TimeEntry();
-
-                                timeEntry.setTicketId(ticketId);
-                                timeEntry.setDetailDescriptionFlag(false);
-                                timeEntry.setInternalAnalysisFlag(true);
-                                timeEntry.setResolutionFlag(false);
-                                timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
-                                timeEntry.setActualHours(String.valueOf(0.0));
-                                timeEntry.setTimeEnd(null);
-                                timeEntry.setInfo(null);
-                                //timeEntry.setNotes("Assigned / Selected Resources. / ");
-                                timeEntry.setEmailCcFlag(false);
-                                timeEntry.setEmailContactFlag(false);
-                                timeEntry.setEmailResourceFlag(false);
-                                
-                                
-                                connectwiseService.assignTicketTo(userId, userIdentifier, ticketId);
-                                connectwiseService.addTimeEntryToTicket(companyId, String.valueOf(ticketId), timeEntry);
-                            }
+                            }).start();
                         }
 
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
