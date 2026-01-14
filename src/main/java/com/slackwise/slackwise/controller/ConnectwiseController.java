@@ -223,7 +223,11 @@ public class ConnectwiseController {
                                         
                                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " is unassigned.");
                                         
-                                        if (ticket2.getSummary().toLowerCase().contains("re:") || ticket2.getSummary().toLowerCase().contains("compliance: set and review") || ticket2.getSummary().toLowerCase().contains("info systems audits") || ticket2.getSummary().toLowerCase().contains("internal system vulnerability") || ticket2.getSummary().toLowerCase().contains("monitor firewall and report") || ticket2.getSummary().toLowerCase().contains("routine security check") || ticket2.getSummary().toLowerCase().contains("documentation for review of permissions") || ticket2.getSummary().toLowerCase().contains("compliance") || ticket2.getSummary().toLowerCase().contains("audit") || ticket2.getContact().equals(leadContactName)) {
+                                        if (ticket2.getSummary().toLowerCase().contains("re:") || ticket2.getSummary().toLowerCase().contains("compliance: set and review") || ticket2.getSummary().toLowerCase().contains("info systems audits") || 
+                                        ticket2.getSummary().toLowerCase().contains("internal system vulnerability") || ticket2.getSummary().toLowerCase().contains("monitor firewall and report") || 
+                                        ticket2.getSummary().toLowerCase().contains("routine security check") || ticket2.getSummary().toLowerCase().contains("documentation for review of permissions") || 
+                                        ticket2.getSummary().toLowerCase().contains("compliance") || ticket2.getSummary().toLowerCase().contains("audit") || 
+                                        ticket2.getContact().getName().toLowerCase().contains(leadContactName.toLowerCase())) {
                                             System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " appears to be a ticket opened by team for compliance or internal review. Skipping assignment.");
                                             System.out.println("__________________________________________________________________"); // Separator for logs
                                             
