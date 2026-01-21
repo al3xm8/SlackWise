@@ -13,8 +13,11 @@ public final class TextFormatTranslator {
     private static final Pattern SLACK_BOLD = Pattern.compile("(?<!\\*)\\*([^*]+)\\*(?!\\*)");
     private static final Pattern SLACK_ITALIC = Pattern.compile("(?<!_)_([^_]+)_(?!_)");
 
+    private static final Pattern MARKDOWN_IMAGE_LINK = Pattern.compile("\\[!\\[[^\\]]*\\]\\((https?://[^)]+)\\)\\]\\((https?://[^)]+)\\)");
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*\\]\\((https?://[^)]+)\\)");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!\\!)\\[([^\\]]+)\\]\\((https?://[^)]+)\\)");
     private static final Pattern MARKDOWN_STRIKE = Pattern.compile("~~([^~]+)~~");
+    private static final Pattern MARKDOWN_BOLD_UNDERSCORE = Pattern.compile("__([^_]+)__");
     private static final Pattern MARKDOWN_BOLD = Pattern.compile("\\*\\*([^*]+)\\*\\*");
     private static final Pattern MARKDOWN_ITALIC = Pattern.compile("(?<!\\*)\\*([^*]+)\\*(?!\\*)");
 
@@ -97,8 +100,11 @@ public final class TextFormatTranslator {
         }
 
         String converted = segment;
+        converted = MARKDOWN_IMAGE_LINK.matcher(converted).replaceAll("$2");
+        converted = MARKDOWN_IMAGE.matcher(converted).replaceAll("$1");
         converted = MARKDOWN_LINK.matcher(converted).replaceAll("<$2|$1>");
         converted = MARKDOWN_STRIKE.matcher(converted).replaceAll("~$1~");
+        converted = MARKDOWN_BOLD_UNDERSCORE.matcher(converted).replaceAll("*$1*");
         converted = MARKDOWN_ITALIC.matcher(converted).replaceAll("_$1_");
         converted = MARKDOWN_BOLD.matcher(converted).replaceAll("*$1*");
         return converted;
