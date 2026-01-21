@@ -243,7 +243,7 @@ public class ConnectwiseController {
                                             timeEntry.setActualHours(String.valueOf(0.0));
                                             timeEntry.setTimeEnd(null);
                                             timeEntry.setInfo(null);
-                                            timeEntry.setNotes("Assigned / Selected Resources. / ");
+                                            timeEntry.setNotes("Assigned / amatos / ");
                                             timeEntry.setEmailCcFlag(false);
                                             timeEntry.setEmailContactFlag(false);
                                             timeEntry.setEmailResourceFlag(false);

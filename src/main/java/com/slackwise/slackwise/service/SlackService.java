@@ -227,8 +227,7 @@ public class SlackService {
 
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
-                            .text("🆔 " + note.getId() + "   👤 " + contactName)
-                            .blocks(blocks)
+                            .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + noteText)
                             .threadTs(tsThread)
                             .mrkdwn(true)
                     );
