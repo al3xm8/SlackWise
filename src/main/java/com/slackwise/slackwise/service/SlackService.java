@@ -11,6 +11,7 @@ import com.slack.api.model.block.ImageBlock;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import com.slack.api.model.block.composition.MarkdownTextObject;
+import com.slackwise.slackwise.util.TextFormatTranslator;
 
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -82,14 +83,15 @@ public class SlackService {
             contactName = connectwiseService.getContactNameByTicketId(ticketId);
         }
 
-        final String finalContactName = contactName; 
+        final String finalContactName = contactName;
+        String slackSummary = summary != null ? TextFormatTranslator.connectwiseToSlack(summary) : "";
 
         try {
 
             // Post to Slack
             ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                     .channel(slackChannelId)
-                    .text("🆔" + ticketId + "    👤" + finalContactName + "\n📝: " + summary)
+                    .text("🆔" + ticketId + "    👤" + finalContactName + "\n📝: " + slackSummary)
                     .mrkdwn(true)
             );
 
@@ -184,50 +186,15 @@ public class SlackService {
             // Only post if this note ID hasn't been posted yet
             if (!postedNoteIds.contains(noteIdStr)) {
                 try {
-                    // Extract image URLs from note text
-                    List<String> imageUrls = new ArrayList<>();
-                    List<LayoutBlock> blocks = new ArrayList<>();
 
                     String noteText = note.getText();
-                    // Matches https link associated with picttures inside the sender's text
-                    //https://regex101.com/r/r7kZ0H/2
-                    Pattern imgUrlPattern = Pattern.compile("\\!\\[.*]\\((.*)\\)");
-                    Matcher imgMatcher = imgUrlPattern.matcher(noteText);
-
-                    while (imgMatcher.find()) {
-                        imageUrls.add(imgMatcher.group(1));
-                    }
-
-                    // Clean the note text by removing image markdown syntax
-                    String cleanedText = imgUrlPattern.matcher(noteText).replaceAll("").trim();
+                    String slackNoteText = TextFormatTranslator.connectwiseToSlack(noteText);
                     
-                    /// Add the note text section
-                    blocks.add(SectionBlock.builder()
-                        .text(MarkdownTextObject.builder()
-                            .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + cleanedText)
-                            .build())
-                        .build());
-                        
-                    // Add image blocks for each extracted URL
-                    for (String url : imageUrls) {
-                        blocks.add(ImageBlock.builder()
-                            .imageUrl(url)
-                            .altText("attachment")
-                            .build());
-                    }
-
-                    // Add separator at the very end
-                    blocks.add(SectionBlock.builder()
-                        .text(MarkdownTextObject.builder()
-                            .text("\n__________________________________")
-                            .build())
-                        .build());
-                                        
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Cleaned text: " + cleanedText);
+                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Text: \n" + slackNoteText);
 
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
-                            .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + noteText)
+                            .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + slackNoteText)
                             .threadTs(tsThread)
                             .mrkdwn(true)
                     );

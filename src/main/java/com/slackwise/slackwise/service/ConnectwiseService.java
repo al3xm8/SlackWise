@@ -31,6 +31,7 @@ import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slackwise.slackwise.model.Note;
 import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.model.TimeEntry;
+import com.slackwise.slackwise.util.TextFormatTranslator;
 
 @Service
 public class ConnectwiseService {
@@ -378,6 +379,7 @@ public class ConnectwiseService {
                 return;
             }
             String description = commandPattern.matcher(text).replaceAll("").trim();
+            description = TextFormatTranslator.slackToConnectwise(description);
             timeEntry.setNotes(description);
 
             String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
@@ -419,6 +421,7 @@ public class ConnectwiseService {
 
 
             String description = commandPattern.matcher(text).replaceAll("").trim();
+            description = TextFormatTranslator.slackToConnectwise(description);
             timeEntry.setNotes(description);
 
             String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
