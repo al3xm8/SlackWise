@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +25,9 @@ public class SlackController {
 
     @Autowired
     ConnectwiseService connectwiseService;
+    
+    @Value("${company.id}")
+    private String tenantId;
 
     /**
      * Handles incoming Slack events, including URL verification challenges.
@@ -69,7 +73,7 @@ public class SlackController {
                 String threadTs = event.get("thread_ts") != null ? String.valueOf(event.get("thread_ts")) : null;
                 String ts = event.get("ts") != null ? String.valueOf(event.get("ts")) : null;
 
-                String ticketId = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
+                String ticketId = amazonService.getTicketIdByThreadTs(tenantId,threadTs != null ? threadTs : ts);
                 // Ignore Slack messages created by this app that use the Note-ID/Ticket-ID prefix
                 if (text != null && (text.startsWith("🆔"))) {
                     System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Ignoring app-generated Slack message: " + text);
@@ -81,7 +85,7 @@ public class SlackController {
                     // Process the Slack reply asynchronously to avoid blocking the response to Slack (ACK quikckly)
                     new Thread(() -> {
                         try {
-                            connectwiseService.addSlackReplyToTicket(ticketId, text, event);
+                            connectwiseService.addSlackReplyToTicket(tenantId, ticketId, text, event);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }

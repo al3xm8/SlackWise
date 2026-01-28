@@ -32,12 +32,7 @@ import java.util.regex.Matcher;
 @Service
 public class SlackService {
 
-    // Slack configuration properties
-    @Value("${slack.bot.token}")
-    private String slackBotToken;
 
-    @Value("${slack.channel.id}")
-    private String slackChannelId;
 
     // Slack client instance
     private final Slack slack = Slack.getInstance();
@@ -47,8 +42,6 @@ public class SlackService {
 
     @Autowired
     private ConnectwiseService connectwiseService;
-
-    public Tenant tenant;
 
      /**
      * Handles posting a NEW ticket to Slack.
@@ -60,13 +53,12 @@ public class SlackService {
      * @throws SlackApiException
      * @throws InterruptedException 
      */
-    public ChatPostMessageResponse postNewTicket(String ticketId, String summary) throws IOException, InterruptedException {
+    public ChatPostMessageResponse postNewTicket(String tenantId, String ticketId, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException {
 
-        amazonService.tenant = tenant;
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
-        if (amazonService.createTicketItem(ticketId, "") == false) {
+        if (amazonService.createTicketItem(tenantId, ticketId, "") == false) {
             // Ticket item already exists, so another process has already posted the Slack message.
             System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket item already exists for ticketId: " + ticketId + ", skipping Slack post.");
             return null;
@@ -99,7 +91,7 @@ public class SlackService {
 
             // Attempt to set the thread_ts in DynamoDB. If this fails, it means another process
             // has already set it, so we delete the duplicate Slack message we just posted.
-            if (!amazonService.setThreadTs(ticketId, postedTs)) {
+            if (!amazonService.setThreadTs(tenantId, ticketId, postedTs)) {
                 slack.methods(slackBotToken).chatDelete(req -> req
                         .channel(slackChannelId)
                         .ts(postedTs)
@@ -110,7 +102,7 @@ public class SlackService {
             }
 
             // Update the ticket item with the posted thread_ts
-            amazonService.updateThreadTs(ticketId, postedTs);
+            amazonService.updateThreadTs(tenantId, ticketId, postedTs);
 
             return response;
 
@@ -119,8 +111,6 @@ public class SlackService {
             return null;
 
         }
-
-        
 
         
     }
@@ -135,14 +125,14 @@ public class SlackService {
      * @throws IOException 
      * @throws SlackApiException 
      */
-    public List<ChatPostMessageResponse> updateTicketThread(String ticketId, List<Note> discussion, String summary) throws IOException, InterruptedException, SlackApiException {
+    public List<ChatPostMessageResponse> updateTicketThread(String tenantId, String ticketId, List<Note> discussion, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException, SlackApiException {
 
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
         List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
 
         // Fetch thread_ts and posted notes from DynamoDB
-        Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
+        Map<String, AttributeValue> ticket = amazonService.getTicket(tenantId, ticketId);
 
         // If Dynamo lookup fails, log and continue to attempt posting (fail open)
         String tsThread = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
@@ -153,8 +143,8 @@ public class SlackService {
         // If posting the new ticket fails, abort the note posting. Don't want to spam Slack.
         if (tsThread == null) {
             System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No thread_ts found for ticket " + ticketId + ". Posting ticket to slack channel.");
-            postNewTicket(ticketId, summary);
-            ticket = amazonService.getTicket(ticketId);
+            postNewTicket(tenantId, ticketId, summary, slackChannelId, slackBotToken);
+            ticket = amazonService.getTicket(tenantId, ticketId);
 
             String tsThread2 = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
             if (tsThread2 == null) {
@@ -208,7 +198,7 @@ public class SlackService {
                     } else {
                         responses.add(response);
                         // Save noteId and ts in DynamoDB
-                        amazonService.addNoteToTicket(ticketId, noteIdStr, response.getTs());
+                        amazonService.addNoteToTicket(tenantId, ticketId, noteIdStr, response.getTs());
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Posted note " + noteIdStr + " to Slack for ticket " + ticketId);
                     }
                 } catch (IOException | SlackApiException e) {

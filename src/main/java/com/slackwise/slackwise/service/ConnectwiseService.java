@@ -340,7 +340,7 @@ public class ConnectwiseService {
      * @throws IOException 
      * @throws SlackApiException 
      */
-    public void addSlackReplyToTicket(String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException, SlackApiException {
+    public void addSlackReplyToTicket(String tenantId, String ticketId, String text, Map<String,Object> event) throws IOException, InterruptedException, SlackApiException {
 
         //https://regex101.com/r/6uC4Tj/2
         Pattern commandPattern = Pattern.compile("\\$([\\w\\d]+)=?([\\d.]+)?(([\\w\\d@.]+);\\n" + //
@@ -391,14 +391,14 @@ public class ConnectwiseService {
             try {
                 if (created != null) {
                     // Save ConnectWise ticket id and the Slack thread ts in DynamoDB so updateTicketThread won't repost it
-                    amazonService.addNoteToTicket(ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
+                    amazonService.addNoteToTicket(tenantId, ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
                     System.out.println("Added ConnectWise Ticket ID " + created.getTimeEntryId() + " for ticket " + ticketId + " linked to Slack ts " + slackTs);
                     System.out.println("#" + ticketId + " - " + "Ticket text:\n" + timeEntry.getNotes());
                 }
             } catch (Exception e) {
                 // If parsing fails, fallback to saving the Slack client_msg_id if available
                 String timeEntryId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
-                amazonService.addNoteToTicket(ticketId, timeEntryId, slackTs);
+                amazonService.addNoteToTicket(tenantId, ticketId, timeEntryId, slackTs);
             }
 
         } else {
@@ -433,14 +433,14 @@ public class ConnectwiseService {
             try {
                 if (created != null) {
                     // Save ConnectWise ticket id and the Slack thread ts in DynamoDB so updateTicketThread won't repost it
-                    amazonService.addNoteToTicket(ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
+                    amazonService.addNoteToTicket(tenantId, ticketId, String.valueOf(created.getTimeEntryId()), slackTs);
                     System.out.println("Added ConnectWise Ticket ID " + created.getTimeEntryId() + " for ticket " + ticketId + " linked to Slack ts " + slackTs);
                     System.out.println("#" + ticketId + " - " + "Ticket text:\n" + timeEntry.getNotes());
                 }
             } catch (Exception e) {
                 // If parsing fails, fallback to saving the Slack client_msg_id if available
                 String timeEntryId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
-                amazonService.addNoteToTicket(ticketId, timeEntryId, slackTs);
+                amazonService.addNoteToTicket(tenantId, ticketId, timeEntryId, slackTs);
             }
 
             /**

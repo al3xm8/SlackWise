@@ -25,6 +25,7 @@ import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.model.TimeEntry;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
+import com.slackwise.slackwise.service.RoutingService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.methods.SlackApiException;
@@ -41,6 +42,9 @@ public class ConnectwiseController {
 
     @Autowired
     SlackService slackService;
+
+    @Autowired
+    RoutingService routingService;
 
     Tenant tenant;
 
@@ -63,6 +67,15 @@ public class ConnectwiseController {
     
     @Value("${lead.contact.name}")
     private String leadContactName;
+    
+    // Slack configuration properties
+    @Value("${slack.bot.token}")
+    private String slackBotToken;
+    
+    @Value("${slack.channel.id}")
+    private String slackChannelId;
+    
+    private String tenantId;
     
     // Base URL for ConnectWise API
     private String baseUrl = "https://na.myconnectwise.net/v4_6_release/apis/3.0";
@@ -131,8 +144,9 @@ public class ConnectwiseController {
             }
 
             tenant = new Tenant(String.valueOf(payload.get("CompanyId"))); 
-            slackService.tenant = tenant;
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted tenant ID: " + tenant.getTenantId());
+            tenantId = tenant.getTenantId();
+            
+            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted tenant ID: " + tenantId);
 
             /*
                 Get ticket ID from payload
@@ -200,11 +214,13 @@ public class ConnectwiseController {
                     // Only process if action is "added" or "updated"
                     if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
+                        String resolvedChannelId = routingService.resolveChannel(tenantId, ticket, slackChannelId);
+
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
-                        slackService.postNewTicket(ticketId.toString(), ticket.getSummary());
+                        slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, slackBotToken);
 
                         System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Updating Slack Thread for new ticket " + ticketId);
-                        slackService.updateTicketThread(ticketId.toString(), ticket.getDiscussion(), ticket.getSummary());
+                        slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId, slackBotToken);
                         
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
                         final int finalTicketId = ticketId;
