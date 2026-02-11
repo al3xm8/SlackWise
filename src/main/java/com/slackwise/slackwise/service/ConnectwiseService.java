@@ -442,47 +442,6 @@ public class ConnectwiseService {
                 String timeEntryId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
                 amazonService.addNoteToTicket(tenantId, ticketId, timeEntryId, slackTs);
             }
-
-            /**
-             * Notes have minimal value compared to time entries as they dont log hours worked
-             * Therefore removing the ability to add notes from Slack replies
-             * 
-            System.out.println("Reply beind added as a note: " + text + " to ticket " + ticketId);
-
-            Note note = new Note();
-            note.setTicketId(Integer.parseInt(ticketId));
-            note.setText(text);
-            note.setDetailDescriptionFlag(true);
-            note.setInternalAnalysisFlag(false);
-            note.setResolutionFlag(false);
-            note.setDateCreated((String) event.getOrDefault("ts", java.time.Instant.now().toString()));
-            note.setTimeStart(null);
-            note.setTimeEnd(null);
-            note.setInfo(null);
-            
-            String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
-            
-            try {
-                // Add the note to ConnectWise
-                String jsonResponse = addNoteToTicket(companyId, ticketId, note);
-                ObjectMapper mapper = new ObjectMapper();
-                 try {
-                    Note created = mapper.readValue(jsonResponse, Note.class);
-                    if (created != null) {
-                        // Save ConnectWise note id and the Slack thread ts in DynamoDB
-                        amazonService.addNoteToTicket(ticketId, String.valueOf(created.getId()), slackTs);
-                        System.out.println("Added ConnectWise note ID " + created.getId() + " for ticket " + ticketId + " linked to Slack ts " + slackTs);
-                        System.out.println("#" + ticketId + " - " + "Note text:\n" + note.getText());
-                    }
-                } catch (Exception e) {
-                    // If parsing fails, fallback to saving the Slack client_msg_id if available
-                    String noteId = String.valueOf(event.getOrDefault("client_msg_id", slackTs));
-                    amazonService.addNoteToTicket(ticketId, noteId, slackTs);
-                }
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
-            }
-            */
         }
     }
 
