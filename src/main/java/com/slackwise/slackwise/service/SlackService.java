@@ -15,6 +15,8 @@ import com.slackwise.slackwise.util.TextFormatTranslator;
 
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,13 +33,9 @@ import java.util.regex.Matcher;
 
 @Service
 public class SlackService {
+    private static final Logger log = LoggerFactory.getLogger(SlackService.class);
 
-    // Slack configuration properties
-    @Value("${slack.bot.token}")
-    private String slackBotToken;
 
-    @Value("${slack.channel.id}")
-    private String slackChannelId;
 
     // Slack client instance
     private final Slack slack = Slack.getInstance();
@@ -47,8 +45,6 @@ public class SlackService {
 
     @Autowired
     private ConnectwiseService connectwiseService;
-
-    public Tenant tenant;
 
      /**
      * Handles posting a NEW ticket to Slack.
@@ -60,15 +56,14 @@ public class SlackService {
      * @throws SlackApiException
      * @throws InterruptedException 
      */
-    public ChatPostMessageResponse postNewTicket(String ticketId, String summary) throws IOException, InterruptedException {
+    public ChatPostMessageResponse postNewTicket(String tenantId, String ticketId, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException {
 
-        amazonService.tenant = tenant;
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
-        if (amazonService.createTicketItem(ticketId, "") == false) {
+        if (amazonService.createTicketItem(tenantId, ticketId, "") == false) {
             // Ticket item already exists, so another process has already posted the Slack message.
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket item already exists for ticketId: " + ticketId + ", skipping Slack post.");
+            log.info("Ticket item already exists for ticketId={}, skipping Slack post", ticketId);
             return null;
         }
 
@@ -99,28 +94,26 @@ public class SlackService {
 
             // Attempt to set the thread_ts in DynamoDB. If this fails, it means another process
             // has already set it, so we delete the duplicate Slack message we just posted.
-            if (!amazonService.setThreadTs(ticketId, postedTs)) {
+            if (!amazonService.setThreadTs(tenantId, ticketId, postedTs)) {
                 slack.methods(slackBotToken).chatDelete(req -> req
                         .channel(slackChannelId)
                         .ts(postedTs)
                 );
 
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Another process set ts_thread for ticketId: " + ticketId + ", deleted duplicate Slack message.");  
+                log.info("Another process set ts_thread for ticketId={}, deleted duplicate Slack message", ticketId);
                 return null;
             }
 
             // Update the ticket item with the posted thread_ts
-            amazonService.updateThreadTs(ticketId, postedTs);
+            amazonService.updateThreadTs(tenantId, ticketId, postedTs);
 
             return response;
 
         } catch (SlackApiException e) {
-            e.printStackTrace();
+            log.error("Failed posting new ticket to Slack for ticketId={}", ticketId, e);
             return null;
 
         }
-
-        
 
         
     }
@@ -135,14 +128,14 @@ public class SlackService {
      * @throws IOException 
      * @throws SlackApiException 
      */
-    public List<ChatPostMessageResponse> updateTicketThread(String ticketId, List<Note> discussion, String summary) throws IOException, InterruptedException, SlackApiException {
+    public List<ChatPostMessageResponse> updateTicketThread(String tenantId, String ticketId, List<Note> discussion, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException, SlackApiException {
 
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
         List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
 
         // Fetch thread_ts and posted notes from DynamoDB
-        Map<String, AttributeValue> ticket = amazonService.getTicket(ticketId);
+        Map<String, AttributeValue> ticket = amazonService.getTicket(tenantId, ticketId);
 
         // If Dynamo lookup fails, log and continue to attempt posting (fail open)
         String tsThread = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
@@ -152,13 +145,13 @@ public class SlackService {
         // or if we missed that event entirely.
         // If posting the new ticket fails, abort the note posting. Don't want to spam Slack.
         if (tsThread == null) {
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No thread_ts found for ticket " + ticketId + ". Posting ticket to slack channel.");
-            postNewTicket(ticketId, summary);
-            ticket = amazonService.getTicket(ticketId);
+            log.warn("No thread_ts found for ticketId={}, posting top-level message", ticketId);
+            postNewTicket(tenantId, ticketId, summary, slackChannelId, slackBotToken);
+            ticket = amazonService.getTicket(tenantId, ticketId);
 
             String tsThread2 = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
             if (tsThread2 == null) {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Failed to retrieve thread_ts after posting new ticket for ticket " + ticketId + ". Aborting note posting.");
+                log.error("Failed to retrieve thread_ts after posting ticketId={}, aborting note posting", ticketId);
                 return null;
             }
         }
@@ -190,7 +183,7 @@ public class SlackService {
                     String noteText = note.getText();
                     String slackNoteText = TextFormatTranslator.connectwiseToSlack(noteText);
                     
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Text: \n" + slackNoteText);
+                    log.debug("Posting note text for ticketId={} noteId={}", ticketId, noteIdStr);
 
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
@@ -201,18 +194,18 @@ public class SlackService {
 
                     // If posting failed, log and skip adding to responses
                     if (!response.isOk()) {
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Failed to post to Slack: " + response.getError());
+                        log.error("Failed to post note to Slack for ticketId={} noteId={}: {}", ticketId, noteIdStr, response.getError());
                         return null;
 
                     // If successful, add to responses and save note in DynamoDB
                     } else {
                         responses.add(response);
                         // Save noteId and ts in DynamoDB
-                        amazonService.addNoteToTicket(ticketId, noteIdStr, response.getTs());
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Posted note " + noteIdStr + " to Slack for ticket " + ticketId);
+                        amazonService.addNoteToTicket(tenantId, ticketId, noteIdStr, response.getTs());
+                        log.info("Posted noteId={} to Slack for ticketId={}", noteIdStr, ticketId);
                     }
                 } catch (IOException | SlackApiException e) {
-                    e.printStackTrace();
+                    log.error("Failed posting note to Slack for ticketId={} noteId={}", ticketId, noteIdStr, e);
                     return null;
                 }
             }

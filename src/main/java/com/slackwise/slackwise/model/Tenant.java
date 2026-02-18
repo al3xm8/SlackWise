@@ -4,7 +4,7 @@ public class Tenant {
     private String tenantId;
 
     public Tenant(String tenantId) {
-        this.tenantId = tenantId;
+        this.tenantId = tenantId.toLowerCase();
     }
 
     public String getTenantId() {

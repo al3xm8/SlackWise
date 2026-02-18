@@ -1,10 +1,12 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,15 +17,21 @@ import com.slack.api.methods.SlackApiException;
 import com.slackwise.slackwise.service.AmazonService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 
+
+
 @RestController
 @RequestMapping("/api/slack")
 public class SlackController {
+    private static final Logger log = LoggerFactory.getLogger(SlackController.class);
 
     @Autowired
     AmazonService amazonService;
 
     @Autowired
     ConnectwiseService connectwiseService;
+    
+    @Value("${company.id}")
+    private String tenantId;
 
     /**
      * Handles incoming Slack events, including URL verification challenges.
@@ -37,12 +45,11 @@ public class SlackController {
     @PostMapping("/events")
     public ResponseEntity<String> handleSlackEvents(@RequestBody Map<String, Object> payload) throws IOException, InterruptedException, SlackApiException {
 
-        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Received Slack event");
+        log.info("Received Slack event");
 
         // Check if this is the initial URL verification challenge
         if ("url_verification".equals(payload.get("type"))) {
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Slack challenge received!");
-            System.out.println("__________________________________________________________________"); // Separator for logs
+            log.info("Slack challenge received");
             return ResponseEntity.ok((String) payload.get("challenge"));
         }
 
@@ -53,12 +60,11 @@ public class SlackController {
 
             // Ignore messages with a subtype (edits, deletions, etc.) and bot messages to avoid loops
             if (event != null && (event.get("subtype") != null && !event.get("subtype").equals("file_share"))) {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Ignoring event with subtype: " + event.get("subtype"));
+                log.debug("Ignoring Slack event with subtype={}", event.get("subtype"));
                 return ResponseEntity.ok("Ignored subtype");
             }
             if (event != null && event.containsKey("bot_id")) {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Ignoring bot event");
-                System.out.println("__________________________________________________________________"); // Separator for logs
+                log.debug("Ignoring bot event");
                 return ResponseEntity.ok("Ignored bot event");
             }
 
@@ -69,26 +75,26 @@ public class SlackController {
                 String threadTs = event.get("thread_ts") != null ? String.valueOf(event.get("thread_ts")) : null;
                 String ts = event.get("ts") != null ? String.valueOf(event.get("ts")) : null;
 
-                String ticketId = amazonService.getTicketIdByThreadTs(threadTs != null ? threadTs : ts);
+                String ticketId = amazonService.getTicketIdByThreadTs(tenantId,threadTs != null ? threadTs : ts);
                 // Ignore Slack messages created by this app that use the Note-ID/Ticket-ID prefix
                 if (text != null && (text.startsWith("🆔"))) {
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> Ignoring app-generated Slack message: " + text);
+                    log.debug("Ignoring app-generated Slack message: {}", text);
                     return ResponseEntity.ok("Ignored app-generated message");
                 }
                 if (ticketId != null) {
-                    System.out.println("Message in thread for ticket " + ticketId + ": " + text + " from user " + user);
+                    log.info("Message in thread for ticketId={} from user={}", ticketId, user);
 
                     // Process the Slack reply asynchronously to avoid blocking the response to Slack (ACK quikckly)
                     new Thread(() -> {
                         try {
-                            connectwiseService.addSlackReplyToTicket(ticketId, text, event);
+                            connectwiseService.addSlackReplyToTicket(tenantId, ticketId, text, event);
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            log.error("Failed to process Slack reply for ticketId={}", ticketId, e);
                         }
                     }).start();
 
                 } else {
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) +"> No ticket found for thread_ts: " + threadTs + " or ts: " + ts);
+                    log.warn("No ticket found for thread_ts={} or ts={}", threadTs, ts);
                 }
                 // Return immediately after scheduling async work to ensure Slack receives a quick 200 OK
                 return ResponseEntity.ok("OK");
