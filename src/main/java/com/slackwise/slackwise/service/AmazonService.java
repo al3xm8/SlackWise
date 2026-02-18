@@ -1,12 +1,13 @@
 package com.slackwise.slackwise.service;
 
 import java.io.IOException;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 
 @Service
 public class AmazonService {
+    private static final Logger log = LoggerFactory.getLogger(AmazonService.class);
 
     private static final String SK_CONFIG = "CONFIG";
     private static final String SK_PREFIX_RULE = "RULE#";
@@ -53,7 +55,7 @@ public class AmazonService {
 
     @Value("${slack.channel.id}")
     private String slackChannelId;
-    
+
     private final Slack slack = Slack.getInstance();
 
     private static String ticketSk(String ticketId) {
@@ -219,7 +221,7 @@ public class AmazonService {
                 .conditionExpression("attribute_not_exists(sk)") // Only put if sk does not exist
                 .build());
 
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket with ticketId " + item.get("ticketId").s() + " and ts_thread" + item.get("ts_thread") + " created in DynamoDB.");
+            log.info("Created DynamoDB ticket item ticketId={} ts_thread={}", item.get("ticketId").s(), item.get("ts_thread").s());
             return true;
             
         // If condition fails (item with ticketId already exists), return false
@@ -421,4 +423,5 @@ public class AmazonService {
                         "sk", AttributeValue.builder().s(ruleSk(priority, ruleId)).build()))
             .build());
     }
+
 }

@@ -1,6 +1,8 @@
 package com.slackwise.slackwise.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -10,6 +12,7 @@ import java.util.stream.Collectors;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Ticket {
+    private static final Logger log = LoggerFactory.getLogger(Ticket.class);
 
     // Fields
     private int id;
@@ -42,7 +45,8 @@ public class Ticket {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class Status {
+    public
+    static class Status {
         public int id;
         public String name;
     }
@@ -90,7 +94,8 @@ public class Ticket {
     }
     
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class Priority {
+    public
+    static class Priority {
         public int id;
         public String name;
         public int sort;
@@ -129,6 +134,13 @@ public class Ticket {
         this.board = board;
     }
 
+    public String getBoardName() {
+        if (board == null || board.name == null || board.name.isBlank()) {
+            return "Unassigned";
+        }
+        return board.name;
+    }
+
     public Status getStatus() {
         return status;
     }
@@ -147,7 +159,7 @@ public class Ticket {
 
 
     public Contact getContact() {
-        return contact;
+        return contact != null ? contact : (this.getContactEmailAddress() != null ? new Contact() : null);
     }
 
     public void setContact(Contact contact) {
@@ -282,8 +294,6 @@ public class Ticket {
     public List<Note> getDiscussion() {
         List<Note> allNotes = new ArrayList<>();
 
-        //System.out.println("Fetching discussion for ticket " + id);
-
         // Add existing notes
         if (notes != null) {
             allNotes.addAll(notes);
@@ -374,21 +384,22 @@ public class Ticket {
     }
 
     public void printTicket(int ticketId) {
-
-        System.out.println("Ticket ID: " + ticketId);
-        System.out.println("Summary: " + summary);
-        System.out.println("Status: " + (status != null ? status.name : "N/A"));
-        System.out.println("Company: " + (company != null ? company.getIdentifier() : "N/A"));
-        System.out.println("Contact: " + (contact != null ? contact.getName() : "N/A"));
-        System.out.println("Contact Phone: " + contactPhoneNumber);
-        System.out.println("Contact Email: " + contactEmailAddress);
-        System.out.println("Type: " + (type != null ? type.name : "N/A"));
-        System.out.println("SubType: " + (subType != null ? subType.name : "N/A"));
-        System.out.println("Closed Flag: " + closedFlag);
-        System.out.println("Actual Hours: " + actualHours);
-        System.out.println("Resources: " + resources);
-        System.out.println("Time Entries:\n" + printTimeEntries());
-        System.out.println("Notes:\n" + printNotes());
-        System.out.println("Discussion:\n" + printDiscussion());
+        StringBuilder sb = new StringBuilder();
+        sb.append("Ticket ID: ").append(ticketId).append('\n')
+          .append("Summary: ").append(summary).append('\n')
+          .append("Status: ").append(status != null ? status.name : "N/A").append('\n')
+          .append("Company: ").append(company != null ? company.getIdentifier() : "N/A").append('\n')
+          .append("Contact: ").append(contact != null ? contact.getName() : "N/A").append('\n')
+          .append("Contact Phone: ").append(contactPhoneNumber).append('\n')
+          .append("Contact Email: ").append(contactEmailAddress).append('\n')
+          .append("Type: ").append(type != null ? type.name : "N/A").append('\n')
+          .append("SubType: ").append(subType != null ? subType.name : "N/A").append('\n')
+          .append("Closed Flag: ").append(closedFlag).append('\n')
+          .append("Actual Hours: ").append(actualHours).append('\n')
+          .append("Resources: ").append(resources).append('\n')
+          .append("Time Entries:\n").append(printTimeEntries()).append('\n')
+          .append("Notes:\n").append(printNotes()).append('\n')
+          .append("Discussion:\n").append(printDiscussion());
+        log.info("{}", sb.toString());
     }
 }

@@ -33,10 +33,10 @@ public class Contact {
     }
 
     public void setName(String name) {
-        this.name = name;
+        this.name = name != null ? name : "N/A";
     }
 
     public String getName() {
-        return this.name;
+        return this.name != null ? this.name : "N/A";
     }
 }

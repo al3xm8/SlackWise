@@ -1,43 +1,33 @@
-import { Link, useLocation } from 'react-router-dom'
-import Logo from './Logo'
+import { Link, NavLink } from 'react-router-dom'
 import '../styles/Navbar.css'
 
 export default function Navbar() {
-  const location = useLocation()
-
-  const isActive = (path: string) => location.pathname === path
-
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <div className="navbar-brand">
-          <Logo />
-          <h1><span style={{ color: 'black' }}>wise</span>drop</h1>
-        </div>
+        <Link to="/" className="navbar-brand">
+          Dropwise
+        </Link>
         <ul className="navbar-menu">
           <li>
-            <Link 
-              to="/" 
-              className={`nav-link ${isActive('/') ? 'active' : ''}`}
-            >
+            <NavLink to="/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Dashboard
-            </Link>
+            </NavLink>
           </li>
           <li>
-            <Link 
-              to="/rules" 
-              className={`nav-link ${isActive('/rules') ? 'active' : ''}`}
-            >
+            <NavLink to="/catchup" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              Catch Up
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/rules" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Rules
-            </Link>
+            </NavLink>
           </li>
           <li>
-            <Link 
-              to="/settings" 
-              className={`nav-link ${isActive('/settings') ? 'active' : ''}`}
-            >
+            <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Settings
-            </Link>
+            </NavLink>
           </li>
         </ul>
       </div>

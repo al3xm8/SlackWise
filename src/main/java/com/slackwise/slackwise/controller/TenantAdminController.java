@@ -18,6 +18,8 @@ import com.slackwise.slackwise.model.RoutingRule;
 import com.slackwise.slackwise.model.TenantConfig;
 import com.slackwise.slackwise.service.AmazonService;
 
+
+
 @RestController
 @RequestMapping("/api/tenants")
 public class TenantAdminController {

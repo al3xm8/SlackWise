@@ -2,13 +2,14 @@ package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
 
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ import jakarta.annotation.PostConstruct;
 @RestController
 @RequestMapping("/api/connectwise")
 public class ConnectwiseController {
+    private static final Logger log = LoggerFactory.getLogger(ConnectwiseController.class);
 
     @Autowired
     ConnectwiseService connectwiseService;
@@ -103,7 +105,7 @@ public class ConnectwiseController {
     public List<Ticket> getOpenTicketsByCompanyId(@PathVariable String companyId) throws IOException, InterruptedException {
 
         List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyId(companyId);
-        System.out.println("Fetched " + tickets.size() + " tickets for company ID: " + companyId);
+        log.info("Fetched {} tickets for companyId={}", tickets.size(), companyId);
 
         for (Ticket t : tickets) {
             openTicketList.add(t.getId());
@@ -127,7 +129,7 @@ public class ConnectwiseController {
 
         synchronized (eventLock) {
             
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Received ConnectWise "+ payload.get("Action") + " event for recordId: " + recordId);
+            log.info("Received ConnectWise action={} event for recordId={}", payload.get("Action"), recordId);
 
             ObjectMapper mapper = new ObjectMapper();
 
@@ -138,15 +140,14 @@ public class ConnectwiseController {
               */
 
             if (!payload.containsKey("CompanyId")) {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No CompanyId found in payload");
-                System.out.println("__________________________________________________________________"); // Separator for logs
+                log.warn("No CompanyId found in payload for recordId={}", recordId);
                 return ResponseEntity.badRequest().body("No CompanyId found in payload");
             }
 
             tenant = new Tenant(String.valueOf(payload.get("CompanyId"))); 
             tenantId = tenant.getTenantId();
             
-            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted tenant ID: " + tenantId);
+            log.info("Extracted tenantId={}", tenantId);
 
             /*
                 Get ticket ID from payload
@@ -155,10 +156,9 @@ public class ConnectwiseController {
 
             if (payload.containsKey("ID")) {
                 ticketId = Integer.valueOf(String.valueOf(payload.get("ID")));
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted ticket ID: " + ticketId);
+                log.info("Extracted ticketId={}", ticketId);
             } else  {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No ticket ID found in payload");
-                System.out.println("__________________________________________________________________"); // Separator for logs
+                log.warn("No ticket ID found in payload for recordId={}", recordId);
                 return ResponseEntity.badRequest().body("No ticket ID found in payload");
             }
 
@@ -175,12 +175,11 @@ public class ConnectwiseController {
                 Map<String, Object> entity = null;
                 if (entityJson != null && !"null".equals(entityJson)) {
                     entity = mapper.readValue(entityJson, new TypeReference<Map<String, Object>>() {});
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted entity from payload");
+                    log.debug("Extracted entity from payload");
                 }
 
                 if (entity == null) {
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Entity is null (something has been deleted). Skipping processing for ticket ID: " + recordId);
-                    System.out.println("__________________________________________________________________"); // Separator for logs
+                    log.warn("Entity is null for recordId={} (likely deleted). Skipping processing", recordId);
                     return ResponseEntity.badRequest().body("No Entity found in payload");
                 }
 
@@ -190,13 +189,11 @@ public class ConnectwiseController {
                 
                 if (company != null && company.get("id") != null) {
                     companyId = String.valueOf(company.get("id"));
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Extracted companyId: " + companyId);
+                    log.info("Extracted companyId={}", companyId);
                 }
 
             } else {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> No Entity found in payload. (This is likely not a ticket.)");
-                System.out.println(payload);
-                System.out.println("__________________________________________________________________"); // Separator for logs
+                log.warn("No Entity found in payload (likely not a ticket): {}", payload);
                 return ResponseEntity.badRequest().body("No Entity found in payload");
             }
 
@@ -216,10 +213,10 @@ public class ConnectwiseController {
 
                         String resolvedChannelId = routingService.resolveChannel(tenantId, ticket, slackChannelId);
 
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Posting new Slack message for ticket: " + ticketId + " - " + ticket.getSummary());
+                        log.info("Posting new Slack message for ticketId={} summary={}", ticketId, ticket.getSummary());
                         slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, slackBotToken);
 
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Updating Slack Thread for new ticket " + ticketId);
+                        log.info("Updating Slack thread for ticketId={}", ticketId);
                         slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId, slackBotToken);
                         
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
@@ -231,20 +228,19 @@ public class ConnectwiseController {
                                     
                                     Thread.sleep(120000); // Wait for 2 minutes before checking for assignment
                                     Ticket ticket2 = connectwiseService.fetchTicketById(finalCompanyId, String.valueOf(finalTicketId));
-                                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Re-fetched ticket " + finalTicketId + " after delay to check for assignment");
+                                    log.info("Re-fetched ticketId={} after delay to check assignment", finalTicketId);
 
                                     if (ticket2.getOwner() != null) {
-                                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " is already assigned to " + ticket.getOwner().identifier + ". No assignment needed.");
+                                        log.info("TicketId={} already assigned to {}. No assignment needed", finalTicketId, ticket.getOwner().identifier);
                                     } else {
                                         
-                                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " is unassigned.");
+                                        log.info("TicketId={} is unassigned", finalTicketId);
                                         
                                         if (ticket2.getSummary().toLowerCase().contains("compliance: set and review") || ticket2.getSummary().toLowerCase().contains("info systems audits") || 
                                         ticket2.getSummary().toLowerCase().contains("internal system vulnerability") || ticket2.getSummary().toLowerCase().contains("monitor firewall and report") || 
                                         ticket2.getSummary().toLowerCase().contains("routine security check") || ticket2.getSummary().toLowerCase().contains("documentation for review of permissions") ||  
                                         ticket2.getContact().getName().toLowerCase().contains(leadContactName.toLowerCase())) {
-                                            System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ticket " + finalTicketId + " appears to be a ticket opened by team for compliance or internal review. Skipping assignment.");
-                                            System.out.println("__________________________________________________________________"); // Separator for logs
+                                            log.info("TicketId={} appears compliance/internal review. Skipping assignment", finalTicketId);
                                             
                                         // Assign ticket to user and add time entry
                                         } else {
@@ -268,31 +264,28 @@ public class ConnectwiseController {
                                         }
                                     }
                                 } catch (Exception e) {
-                                    e.printStackTrace();
+                                    log.error("Error in delayed assignment flow for ticketId={}", finalTicketId, e);
                                 }
                                 
                             }).start();
                         }
 
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Finished processing event for ticketId " + ticketId + " - " + ticket.getSummary());
-                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        log.info("Finished processing event for ticketId={} summary={}", ticketId, ticket.getSummary());
 
                         return ResponseEntity.ok("Processed new ticket event for ticketId: " + ticketId);
                     } else {
-                        System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ignoring ConnectWise event action: " + payload.get("Action"));
-                        System.out.println("__________________________________________________________________"); // Separator for logs
+                        log.info("Ignoring ConnectWise action={}", payload.get("Action"));
                         return ResponseEntity.ok("Ignored event action: " + payload.get("Action"));
                     }
 
                 } else {
-                    System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Failed to fetch ticket " + ticketId);
+                    log.warn("Failed to fetch ticketId={}", ticketId);
                     return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
                 }
             } else {
-                System.out.println("<" + java.time.LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) +"> Ignoring event from ticket: " + ticketId + " (not from list of companies)");
+                log.debug("Ignoring event from ticketId={} (companyId={} not tracked)", ticketId, companyId);
             }
 
-            System.out.println("__________________________________________________________________"); // Separator for logs
             return ResponseEntity.ok("Received");
         }
     }
