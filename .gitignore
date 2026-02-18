@@ -6,6 +6,7 @@ src/main/resources/templates/time-entry.json
 src/main/resources/Thumbs.db
 !**/src/main/**/target/
 !**/src/test/**/target/
+vite.config.ts*
 
 ### STS ###
 .apt_generated

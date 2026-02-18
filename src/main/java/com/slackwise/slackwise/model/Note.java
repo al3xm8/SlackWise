@@ -2,9 +2,12 @@ package com.slackwise.slackwise.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Note {
+    private static final Logger log = LoggerFactory.getLogger(Note.class);
 
     // Fields
 
@@ -137,22 +140,24 @@ public class Note {
     }
 
     public void printNote() {
-        System.out.println("Note ID: " + id);
-        System.out.println("Ticket ID: " + ticketId);
-        System.out.println("Text: " + text);
-        System.out.println("Detail Description Flag: " + detailDescriptionFlag);
-        System.out.println("Internal Analysis Flag: " + internalAnalysisFlag);
-        System.out.println("Resolution Flag: " + resolutionFlag);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Note ID: ").append(id).append('\n')
+          .append("Ticket ID: ").append(ticketId).append('\n')
+          .append("Text: ").append(text).append('\n')
+          .append("Detail Description Flag: ").append(detailDescriptionFlag).append('\n')
+          .append("Internal Analysis Flag: ").append(internalAnalysisFlag).append('\n')
+          .append("Resolution Flag: ").append(resolutionFlag).append('\n');
         if (contact != null) {
-            System.out.println("Contact ID: " + contact.getID());
-            System.out.println("Contact Name: " + contact.getName());
+            sb.append("Contact ID: ").append(contact.getID()).append('\n')
+              .append("Contact Name: ").append(contact.getName()).append('\n');
         } else {
-            System.out.println("Member ID: " + member.getId());
-            System.out.println("Member Name: " + member.getName());
+            sb.append("Member ID: ").append(member.getId()).append('\n')
+              .append("Member Name: ").append(member.getName()).append('\n');
         }
-        System.out.println("Date Created: " + dateCreated);
-        System.out.println("Time Start: " + timeStart);
-        System.out.println("Time End: " + timeEnd);
+        sb.append("Date Created: ").append(dateCreated).append('\n')
+          .append("Time Start: ").append(timeStart).append('\n')
+          .append("Time End: ").append(timeEnd);
+        log.info("{}", sb.toString());
     }   
 
 }
