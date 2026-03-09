@@ -1,12 +1,11 @@
 package com.slackwise.slackwise.controller;
 
 import java.io.IOException;
-
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,22 +21,31 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.slackwise.slackwise.model.Tenant;
+import com.slackwise.slackwise.model.TenantConfig;
 import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.model.TimeEntry;
+import com.slackwise.slackwise.model.RoutingRule;
+import com.slackwise.slackwise.service.AmazonService;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 import com.slackwise.slackwise.service.RoutingService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.methods.SlackApiException;
-import jakarta.annotation.PostConstruct;
-
-
 
 @RestController
 @RequestMapping("/api/connectwise")
 public class ConnectwiseController {
     private static final Logger log = LoggerFactory.getLogger(ConnectwiseController.class);
+    private static final int DEFAULT_AUTO_ASSIGNMENT_DELAY_MINUTES = 2;
+    private static final Set<String> DEFAULT_ASSIGNMENT_EXCLUSION_KEYWORDS = Set.of(
+        "compliance: set and review",
+        "info systems audits",
+        "internal system vulnerability",
+        "monitor firewall and report",
+        "routine security check",
+        "documentation for review of permissions"
+    );
 
     @Autowired
     ConnectwiseService connectwiseService;
@@ -48,18 +56,16 @@ public class ConnectwiseController {
     @Autowired
     RoutingService routingService;
 
+    @Autowired
+    AmazonService amazonService;
+
     Tenant tenant;
 
-    private ArrayList<String> companies = new ArrayList<String>();
-    
-    // Depreceated: now using database to track which tickets have been posted to Slack
+    // Deprecated: now using database to track which tickets have been posted to Slack
     private Set<Integer> openTicketList = new HashSet<>();
 
     // add a simple lock object to serialize onNewEvent() calls
     private final Object eventLock = new Object();
-
-    @Value("${client.id}")
-    private String clientId;
 
     @Value("${user.id}")
     private int userId;
@@ -76,23 +82,12 @@ public class ConnectwiseController {
     
     @Value("${slack.channel.id}")
     private String slackChannelId;
-    
+
+    @Value("${company.idnumber:19300}")
+    private String fallbackTrackedCompanyId;
+
     private String tenantId;
-    
-    // Base URL for ConnectWise API
-    private String baseUrl = "https://na.myconnectwise.net/v4_6_release/apis/3.0";
 
-    /**
-     * Initializes the ticket service by fetching all open tickets for a specific company.
-     * This method is called after the bean is constructed.
-     */
-    @PostConstruct
-    public void initTickets() {
-        companies.add("19300"); // Test company ID, add more if you want to track multiple companies
-        //companies.add("250");
-    }
-
-    
     /**
      * Fetches all tickets for a given company ID.
      *
@@ -149,6 +144,11 @@ public class ConnectwiseController {
             
             log.info("Extracted tenantId={}", tenantId);
 
+            TenantConfig tenantConfig = amazonService.getTenantConfig(tenantId);
+            Set<String> trackedCompanyIds = resolveTrackedCompanyIds(tenantConfig);
+            int autoAssignmentDelayMinutes = resolveAutoAssignmentDelayMinutes(tenantConfig);
+            Set<String> assignmentExclusionKeywords = resolveAssignmentExclusionKeywords(tenantConfig);
+
             /*
                 Get ticket ID from payload
             */ 
@@ -201,8 +201,8 @@ public class ConnectwiseController {
                 Process ticket from payload
             */
             
-            // Only process if the companyId is in our list of companies to track
-            if (companies.contains(companyId)) {
+            // Only process if the companyId is in our tenant-config tracked list
+            if (trackedCompanyIds.contains(companyId)) {
                 Ticket ticket = connectwiseService.fetchTicketById(companyId, ticketId.toString());
 
                 // If ticketFetch successful
@@ -211,7 +211,13 @@ public class ConnectwiseController {
                     // Only process if action is "added" or "updated"
                     if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
-                        String resolvedChannelId = routingService.resolveChannel(tenantId, ticket, slackChannelId);
+                        RoutingRule matchedRule = routingService.resolveRule(tenantId, ticket);
+                        String resolvedChannelId = slackChannelId;
+                        if (matchedRule != null
+                            && matchedRule.getTargetChannelId() != null
+                            && !matchedRule.getTargetChannelId().isBlank()) {
+                            resolvedChannelId = matchedRule.getTargetChannelId();
+                        }
 
                         log.info("Posting new Slack message for ticketId={} summary={}", ticketId, ticket.getSummary());
                         slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, slackBotToken);
@@ -222,24 +228,26 @@ public class ConnectwiseController {
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
                         final int finalTicketId = ticketId;
                         final String finalCompanyId = companyId;
+                        final String ruleAssigneeIdentifier = matchedRule != null ? matchedRule.getTargetAssigneeIdentifier() : null;
+                        final int finalAutoAssignmentDelayMinutes = autoAssignmentDelayMinutes;
+                        final Set<String> finalAssignmentExclusionKeywords = assignmentExclusionKeywords;
                         if (payload.get("Action").equals("added")) {
                             new Thread(() -> {
                                 try {
                                     
-                                    Thread.sleep(120000); // Wait for 2 minutes before checking for assignment
+                                    if (finalAutoAssignmentDelayMinutes > 0) {
+                                        Thread.sleep(finalAutoAssignmentDelayMinutes * 60000L);
+                                    }
                                     Ticket ticket2 = connectwiseService.fetchTicketById(finalCompanyId, String.valueOf(finalTicketId));
                                     log.info("Re-fetched ticketId={} after delay to check assignment", finalTicketId);
 
                                     if (ticket2.getOwner() != null) {
-                                        log.info("TicketId={} already assigned to {}. No assignment needed", finalTicketId, ticket.getOwner().identifier);
+                                        log.info("TicketId={} already assigned to {}. No assignment needed", finalTicketId, ticket2.getOwner().identifier);
                                     } else {
                                         
                                         log.info("TicketId={} is unassigned", finalTicketId);
                                         
-                                        if (ticket2.getSummary().toLowerCase().contains("compliance: set and review") || ticket2.getSummary().toLowerCase().contains("info systems audits") || 
-                                        ticket2.getSummary().toLowerCase().contains("internal system vulnerability") || ticket2.getSummary().toLowerCase().contains("monitor firewall and report") || 
-                                        ticket2.getSummary().toLowerCase().contains("routine security check") || ticket2.getSummary().toLowerCase().contains("documentation for review of permissions") ||  
-                                        ticket2.getContact().getName().toLowerCase().contains(leadContactName.toLowerCase())) {
+                                        if (shouldSkipAutoAssignment(ticket2, finalAssignmentExclusionKeywords)) {
                                             log.info("TicketId={} appears compliance/internal review. Skipping assignment", finalTicketId);
                                             
                                         // Assign ticket to user and add time entry
@@ -254,12 +262,23 @@ public class ConnectwiseController {
                                             timeEntry.setActualHours(String.valueOf(0.0));
                                             timeEntry.setTimeEnd(null);
                                             timeEntry.setInfo(null);
-                                            timeEntry.setNotes("Assigned / amatos / ");
                                             timeEntry.setEmailCcFlag(false);
                                             timeEntry.setEmailContactFlag(false);
                                             timeEntry.setEmailResourceFlag(false);
-                                            
-                                            connectwiseService.assignTicketTo(userId, userIdentifier, finalTicketId);
+
+                                            String assignedIdentifier = userIdentifier;
+                                            if (ruleAssigneeIdentifier != null && !ruleAssigneeIdentifier.isBlank()) {
+                                                try {
+                                                    connectwiseService.assignTicketToIdentifier(ruleAssigneeIdentifier, finalTicketId);
+                                                    assignedIdentifier = ruleAssigneeIdentifier;
+                                                } catch (Exception ex) {
+                                                    log.warn("Rule assignee {} could not be applied for ticketId={}, falling back to default user", ruleAssigneeIdentifier, finalTicketId, ex);
+                                                    connectwiseService.assignTicketTo(userId, userIdentifier, finalTicketId);
+                                                }
+                                            } else {
+                                                connectwiseService.assignTicketTo(userId, userIdentifier, finalTicketId);
+                                            }
+                                            timeEntry.setNotes("Assigned / " + assignedIdentifier + " / ");
                                             connectwiseService.addTimeEntryToTicket(finalCompanyId, String.valueOf(finalTicketId), timeEntry);
                                         }
                                     }
@@ -283,13 +302,74 @@ public class ConnectwiseController {
                     return ResponseEntity.ok("Failed to fetch ticket " + ticketId);
                 }
             } else {
-                log.debug("Ignoring event from ticketId={} (companyId={} not tracked)", ticketId, companyId);
+                log.debug("Ignoring event from ticketId={} (companyId={} not tracked in {})", ticketId, companyId, trackedCompanyIds);
             }
 
             return ResponseEntity.ok("Received");
         }
     }
     
-    
-    
+    private Set<String> resolveTrackedCompanyIds(TenantConfig config) {
+        Set<String> configuredCompanyIds = parseDelimitedValues(config != null ? config.getTrackedCompanyIds() : null);
+        if (!configuredCompanyIds.isEmpty()) {
+            return configuredCompanyIds;
+        }
+
+        Set<String> fallback = new HashSet<>();
+        if (fallbackTrackedCompanyId != null && !fallbackTrackedCompanyId.isBlank()) {
+            fallback.add(fallbackTrackedCompanyId.trim());
+        } else {
+            fallback.add("19300");
+        }
+        return fallback;
+    }
+
+    private int resolveAutoAssignmentDelayMinutes(TenantConfig config) {
+        Integer configuredDelay = config != null ? config.getAutoAssignmentDelayMinutes() : null;
+        if (configuredDelay == null || configuredDelay < 0) {
+            return DEFAULT_AUTO_ASSIGNMENT_DELAY_MINUTES;
+        }
+        return configuredDelay;
+    }
+
+    private Set<String> resolveAssignmentExclusionKeywords(TenantConfig config) {
+        Set<String> configuredKeywords = parseDelimitedValues(config != null ? config.getAssignmentExclusionKeywords() : null)
+            .stream()
+            .map(String::toLowerCase)
+            .collect(Collectors.toSet());
+
+        if (!configuredKeywords.isEmpty()) {
+            return configuredKeywords;
+        }
+        return DEFAULT_ASSIGNMENT_EXCLUSION_KEYWORDS;
+    }
+
+    private Set<String> parseDelimitedValues(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Set.of();
+        }
+
+        Set<String> values = new HashSet<>();
+        String[] split = raw.split("[,;\\r\\n]+");
+        for (String entry : split) {
+            if (entry != null && !entry.isBlank()) {
+                values.add(entry.trim());
+            }
+        }
+        return values;
+    }
+
+    private boolean shouldSkipAutoAssignment(Ticket ticket, Set<String> exclusionKeywords) {
+        String summary = ticket.getSummary() != null ? ticket.getSummary().toLowerCase() : "";
+        boolean summaryMatched = exclusionKeywords.stream().anyMatch(summary::contains);
+        if (summaryMatched) {
+            return true;
+        }
+
+        String contactName = ticket.getContact() != null && ticket.getContact().getName() != null
+            ? ticket.getContact().getName().toLowerCase()
+            : "";
+        String normalizedLeadContact = leadContactName != null ? leadContactName.toLowerCase() : "";
+        return !normalizedLeadContact.isBlank() && contactName.contains(normalizedLeadContact);
+    }
 }

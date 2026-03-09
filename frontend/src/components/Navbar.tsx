@@ -6,7 +6,11 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-brand">
-          Dropwise
+          <img
+            src="/wisedrop-logo-horizontal.svg"
+            alt="Wisedrop"
+            className="navbar-brand-logo"
+          />
         </Link>
         <ul className="navbar-menu">
           <li>

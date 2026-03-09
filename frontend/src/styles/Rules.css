@@ -1,4 +1,3 @@
-/* Rules Styles */
 .rules-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -19,23 +18,192 @@
 
 .rules-container h1 {
   font-size: 2rem;
-  color: #333;
-  margin-bottom: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.4rem;
   font-weight: 600;
 }
 
 .rules-container > p {
-  color: #666;
-  margin-bottom: 2rem;
-  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
 }
 
-.rules-content {
-  background: white;
+.rules-card {
+  background: var(--bg-surface);
   border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  color: #999;
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 1.25rem;
 }
 
+.rules-card h2 {
+  margin: 0 0 1rem;
+  color: var(--accent-text);
+  font-size: 1.2rem;
+}
+
+.tenant-fixed {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.tenant-row,
+.rule-line {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tenant-row label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tenant-row input,
+.rule-line input,
+.rule-line select {
+  height: 38px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 0 0.7rem;
+  min-width: 150px;
+  color: var(--input-text);
+  background: var(--input-bg);
+}
+
+.rule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.toggle-row label {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.actions-line span {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.preview {
+  margin: 0;
+  background: var(--bg-surface-alt);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  padding: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.form-actions button,
+.secondary-btn,
+.danger-btn {
+  border: 0;
+  border-radius: 6px;
+  height: 38px;
+  padding: 0 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.form-actions button {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.form-actions button:disabled,
+.secondary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.danger-btn {
+  background: #ffe7e8;
+  color: #a12d35;
+}
+
+.message {
+  margin: 0.75rem 0 0;
+  font-size: 0.95rem;
+}
+
+.message.error {
+  color: var(--danger-text);
+}
+
+.message.success {
+  color: var(--success-text);
+}
+
+.rules-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.saved-rule {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.9rem;
+  background: var(--bg-surface-alt);
+}
+
+.saved-rule.disabled {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-subtle);
+  opacity: 0.85;
+}
+
+.rule-summary {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.rule-meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.rule-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .rules-container {
+    padding: 1rem;
+  }
+
+  .rules-container h1 {
+    font-size: 1.5rem;
+  }
+
+  .rules-card {
+    padding: 1rem;
+  }
+
+  .tenant-row input,
+  .rule-line input,
+  .rule-line select {
+    width: 100%;
+    min-width: 0;
+  }
+}

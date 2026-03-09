@@ -326,6 +326,18 @@ public class AmazonService {
         if (config.getConnectwisePublicKey() != null) item.put("connectwisePublicKey", AttributeValue.builder().s(config.getConnectwisePublicKey()).build());
         if (config.getConnectwisePrivateKey() != null) item.put("connectwisePrivateKey", AttributeValue.builder().s(config.getConnectwisePrivateKey()).build());
         if (config.getDisplayName() != null) item.put("displayName", AttributeValue.builder().s(config.getDisplayName()).build());
+        if (config.getAutoAssignmentDelayMinutes() != null) {
+            item.put("autoAssignmentDelayMinutes", AttributeValue.builder().n(String.valueOf(config.getAutoAssignmentDelayMinutes())).build());
+        }
+        if (config.getAssignmentExclusionKeywords() != null) {
+            item.put("assignmentExclusionKeywords", AttributeValue.builder().s(config.getAssignmentExclusionKeywords()).build());
+        }
+        if (config.getTrackedCompanyIds() != null) {
+            item.put("trackedCompanyIds", AttributeValue.builder().s(config.getTrackedCompanyIds()).build());
+        }
+        if (config.getThemeMode() != null) {
+            item.put("themeMode", AttributeValue.builder().s(config.getThemeMode()).build());
+        }
 
         dynamoDb.putItem(PutItemRequest.builder()
             .tableName(tableName)
@@ -353,6 +365,18 @@ public class AmazonService {
         if (item.containsKey("connectwisePublicKey")) config.setConnectwisePublicKey(item.get("connectwisePublicKey").s());
         if (item.containsKey("connectwisePrivateKey")) config.setConnectwisePrivateKey(item.get("connectwisePrivateKey").s());
         if (item.containsKey("displayName")) config.setDisplayName(item.get("displayName").s());
+        if (item.containsKey("autoAssignmentDelayMinutes")) {
+            config.setAutoAssignmentDelayMinutes(Integer.valueOf(item.get("autoAssignmentDelayMinutes").n()));
+        }
+        if (item.containsKey("assignmentExclusionKeywords")) {
+            config.setAssignmentExclusionKeywords(item.get("assignmentExclusionKeywords").s());
+        }
+        if (item.containsKey("trackedCompanyIds")) {
+            config.setTrackedCompanyIds(item.get("trackedCompanyIds").s());
+        }
+        if (item.containsKey("themeMode")) {
+            config.setThemeMode(item.get("themeMode").s());
+        }
         return config;
     }
 
@@ -377,6 +401,14 @@ public class AmazonService {
         if (rule.getMatchSubject() != null) item.put("matchSubject", AttributeValue.builder().s(rule.getMatchSubject()).build());
         if (rule.getMatchSubjectRegex() != null) item.put("matchSubjectRegex", AttributeValue.builder().s(rule.getMatchSubjectRegex()).build());
         if (rule.getTargetChannelId() != null) item.put("targetChannelId", AttributeValue.builder().s(rule.getTargetChannelId()).build());
+        if (rule.getTargetAssigneeIdentifier() != null) item.put("targetAssigneeIdentifier", AttributeValue.builder().s(rule.getTargetAssigneeIdentifier()).build());
+        if (rule.getPrimaryField() != null) item.put("primaryField", AttributeValue.builder().s(rule.getPrimaryField()).build());
+        if (rule.getPrimaryOperator() != null) item.put("primaryOperator", AttributeValue.builder().s(rule.getPrimaryOperator()).build());
+        if (rule.getPrimaryValue() != null) item.put("primaryValue", AttributeValue.builder().s(rule.getPrimaryValue()).build());
+        if (rule.getSecondaryField() != null) item.put("secondaryField", AttributeValue.builder().s(rule.getSecondaryField()).build());
+        if (rule.getSecondaryOperator() != null) item.put("secondaryOperator", AttributeValue.builder().s(rule.getSecondaryOperator()).build());
+        if (rule.getSecondaryValue() != null) item.put("secondaryValue", AttributeValue.builder().s(rule.getSecondaryValue()).build());
+        if (rule.getJoinOperator() != null) item.put("joinOperator", AttributeValue.builder().s(rule.getJoinOperator()).build());
 
         dynamoDb.putItem(PutItemRequest.builder()
             .tableName(tableName)
@@ -408,6 +440,14 @@ public class AmazonService {
             if (item.containsKey("matchSubject")) rule.setMatchSubject(item.get("matchSubject").s());
             if (item.containsKey("matchSubjectRegex")) rule.setMatchSubjectRegex(item.get("matchSubjectRegex").s());
             if (item.containsKey("targetChannelId")) rule.setTargetChannelId(item.get("targetChannelId").s());
+            if (item.containsKey("targetAssigneeIdentifier")) rule.setTargetAssigneeIdentifier(item.get("targetAssigneeIdentifier").s());
+            if (item.containsKey("primaryField")) rule.setPrimaryField(item.get("primaryField").s());
+            if (item.containsKey("primaryOperator")) rule.setPrimaryOperator(item.get("primaryOperator").s());
+            if (item.containsKey("primaryValue")) rule.setPrimaryValue(item.get("primaryValue").s());
+            if (item.containsKey("secondaryField")) rule.setSecondaryField(item.get("secondaryField").s());
+            if (item.containsKey("secondaryOperator")) rule.setSecondaryOperator(item.get("secondaryOperator").s());
+            if (item.containsKey("secondaryValue")) rule.setSecondaryValue(item.get("secondaryValue").s());
+            if (item.containsKey("joinOperator")) rule.setJoinOperator(item.get("joinOperator").s());
             rules.add(rule);
         }
         return rules;

@@ -715,6 +715,52 @@ public class ConnectwiseService {
         log.info("Assigned ticketId={} to user={}", ticketId, userIdentifier);
     }
 
+    public void assignTicketToIdentifier(String userIdentifierToAssign, int ticketId) throws IOException, InterruptedException {
+        if (userIdentifierToAssign == null || userIdentifierToAssign.isBlank()) {
+            throw new IllegalArgumentException("userIdentifierToAssign is null/blank");
+        }
+
+        Integer memberId = findMemberIdByIdentifier(userIdentifierToAssign.trim());
+        if (memberId == null) {
+            throw new IOException("Could not resolve ConnectWise member id for identifier: " + userIdentifierToAssign);
+        }
+
+        assignTicketTo(memberId, userIdentifierToAssign.trim(), ticketId);
+    }
+
+    private Integer findMemberIdByIdentifier(String identifier) throws IOException, InterruptedException {
+        String escapedIdentifier = identifier.replace("'", "''");
+        String conditions = URLEncoder.encode("identifier='" + escapedIdentifier + "'", StandardCharsets.UTF_8);
+        String fields = URLEncoder.encode("id,identifier", StandardCharsets.UTF_8);
+
+        String endpoint = "/system/members";
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields + "&pageSize=1"))
+            .header("Authorization", buildAuthHeader())
+            .header("clientId", clientId)
+            .header("Content-Type", "application/json")
+            .GET()
+            .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        int statusCode = response.statusCode();
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new IOException("ConnectWise member lookup failed with HTTP " + statusCode + ". Body: " + safeBodySnippet(response.body()));
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(response.body());
+        if (!root.isArray() || root.isEmpty()) {
+            return null;
+        }
+
+        JsonNode member = root.get(0);
+        if (!member.has("id") || !member.get("id").canConvertToInt()) {
+            return null;
+        }
+        return member.get("id").asInt();
+    }
+
     /**
      * Updates a ticket status by status name.
      *

@@ -1,0 +1,43 @@
+<!-- Wisedrop Logo - Full Horizontal (Transparent) -->
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dropGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="highlightGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:0.6" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Droplet Icon -->
+  <g transform="translate(30, 0)">
+    <path 
+      d="M 150 21 C 150 21, 43 107, 43 171 C 43 230, 91 278, 150 278 C 209 278, 257 230, 257 171 C 257 107, 150 21, 150 21 Z"
+      fill="url(#dropGradient2)"
+    />
+    <ellipse 
+      cx="129" 
+      cy="129" 
+      rx="43" 
+      ry="64"
+      fill="url(#highlightGradient2)"
+    />
+    <g stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9">
+      <line x1="150" y1="97" x2="150" y2="181" />
+      <line x1="150" y1="181" x2="118" y2="150" />
+      <line x1="150" y1="181" x2="182" y2="150" />
+    </g>
+  </g>
+  
+  <!-- Text: "wise" -->
+  <text x="330" y="210" font-family="'Outfit', sans-serif" font-size="140" font-weight="800" fill="white" letter-spacing="-2">wise</text>
+  
+  <!-- Text: "drop" with gradient -->
+  <text x="620" y="210" font-family="'Outfit', sans-serif" font-size="140" font-weight="800" fill="url(#textGradient)" letter-spacing="-2">drop</text>
+</svg>

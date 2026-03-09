@@ -19,7 +19,7 @@
 
 .dashboard-container h1 {
   font-size: 2rem;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 2rem;
   font-weight: 600;
 }
@@ -33,15 +33,15 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--bg-surface);
   border-radius: 8px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--card-shadow);
   transition: transform 0.3s, box-shadow 0.3s;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid var(--accent);
 }
 
 .stat-card:hover {
@@ -57,7 +57,7 @@
 
 .stat-content h3 {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
   margin: 0 0 0.5rem 0;
   text-transform: uppercase;
   font-weight: 600;
@@ -65,17 +65,17 @@
 
 .stat-value {
   font-size: 1.8rem;
-  color: #667eea;
+  color: var(--accent);
   font-weight: bold;
   margin: 0;
 }
 
 /* Dashboard Section */
 .dashboard-section {
-  background: white;
+  background: var(--bg-surface);
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--card-shadow);
 }
 
 .breakdown-grid {
@@ -86,7 +86,7 @@
 
 .dashboard-section h2 {
   font-size: 1.5rem;
-  color: #333;
+  color: var(--text-primary);
   margin: 0;
   font-weight: 600;
 }
@@ -104,8 +104,8 @@
   height: 44px;
   border: 0;
   border-radius: 999px;
-  background: #f1f3ff;
-  color: #4453b8;
+  background: var(--accent-soft);
+  color: var(--accent-text);
   font-size: 1.2rem;
   font-weight: 700;
   cursor: pointer;
@@ -113,7 +113,7 @@
 }
 
 .breakdown-nav-btn:hover {
-  background: #e2e7ff;
+  background: var(--bg-surface-hover);
   transform: translateY(-1px);
 }
 
@@ -128,11 +128,11 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #c8d0f7;
+  background: var(--border-subtle);
 }
 
 .breakdown-indicator.active {
-  background: #667eea;
+  background: var(--accent);
 }
 
 .bar-chart {
@@ -149,7 +149,7 @@
 }
 
 .bar-label {
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -160,7 +160,7 @@
   width: 100%;
   height: 16px;
   border-radius: 999px;
-  background: #ecf0ff;
+  background: var(--bg-surface-alt);
   overflow: hidden;
 }
 
@@ -168,19 +168,19 @@
   height: 100%;
   min-width: 2px;
   border-radius: inherit;
-  background: linear-gradient(90deg, #667eea 0%, #5a67d8 100%);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 100%);
   transition: width 0.25s ease-out;
 }
 
 .bar-value {
   text-align: right;
-  color: #4453b8;
+  color: var(--accent-text);
   font-size: 0.95rem;
   font-weight: 700;
 }
 
 .empty-breakdown {
-  color: #666;
+  color: var(--text-secondary);
   margin: 0.5rem 0 0;
 }
 

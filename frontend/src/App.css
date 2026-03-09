@@ -1,6 +1,6 @@
 /* App Styles */
 main.main-content {
   flex: 1;
-  background-color: #f5f5f5;
+  background-color: var(--bg-page);
   padding-top: 1rem;
 }

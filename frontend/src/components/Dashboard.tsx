@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import '../styles/Dashboard.css'
+import CenteredLoadingBar from './CenteredLoadingBar'
 
 interface DashboardStats {
   averageResponseTime: string
@@ -33,8 +34,12 @@ export default function Dashboard() {
         if (!response.ok) throw new Error('Failed to fetch stats')
         const data = await response.json()
         setStats(data)
-      } catch (err: any) {
-        setError(err.message || 'Error fetching dashboard stats')
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message)
+        } else {
+          setError('Error fetching dashboard stats')
+        }
       } finally {
         setLoading(false)
       }
@@ -43,7 +48,7 @@ export default function Dashboard() {
   }, [])
 
   if (loading) {
-    return <div className="dashboard-container"><p>Loading...</p></div>
+    return <CenteredLoadingBar label="Loading dashboard..." />
   }
   if (error) {
     return <div className="dashboard-container"><p style={{ color: 'red' }}>Error: {error}</p></div>

@@ -10,6 +10,10 @@ public class TenantConfig {
     private String connectwisePublicKey;
     private String connectwisePrivateKey;
     private String displayName;
+    private Integer autoAssignmentDelayMinutes;
+    private String assignmentExclusionKeywords;
+    private String trackedCompanyIds;
+    private String themeMode;
 
     public String getTenantId() {
         return tenantId;
@@ -81,5 +85,37 @@ public class TenantConfig {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public Integer getAutoAssignmentDelayMinutes() {
+        return autoAssignmentDelayMinutes;
+    }
+
+    public void setAutoAssignmentDelayMinutes(Integer autoAssignmentDelayMinutes) {
+        this.autoAssignmentDelayMinutes = autoAssignmentDelayMinutes;
+    }
+
+    public String getAssignmentExclusionKeywords() {
+        return assignmentExclusionKeywords;
+    }
+
+    public void setAssignmentExclusionKeywords(String assignmentExclusionKeywords) {
+        this.assignmentExclusionKeywords = assignmentExclusionKeywords;
+    }
+
+    public String getTrackedCompanyIds() {
+        return trackedCompanyIds;
+    }
+
+    public void setTrackedCompanyIds(String trackedCompanyIds) {
+        this.trackedCompanyIds = trackedCompanyIds;
+    }
+
+    public String getThemeMode() {
+        return themeMode;
+    }
+
+    public void setThemeMode(String themeMode) {
+        this.themeMode = themeMode;
     }
 }

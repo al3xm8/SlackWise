@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import '../styles/CatchUp.css'
 import { uiDebug, uiError, uiWarn } from '../utils/uiDebug'
+import CenteredLoadingBar from './CenteredLoadingBar'
 
 interface TicketResponse {
   id: number
@@ -169,7 +170,13 @@ const mapTicket = (ticket: ApiTicket): TicketData => {
     })
     .sort((a: TicketResponseWithTs, b: TicketResponseWithTs) => b._ts - a._ts)
 
-  const responses = responsesWithTs.map(({ _ts, ...item }) => item)
+  const responses: TicketResponse[] = responsesWithTs.map((item) => ({
+    id: item.id,
+    author: item.author,
+    content: item.content,
+    timestamp: item.timestamp,
+    type: item.type,
+  }))
   const latestUpdateTs = responsesWithTs.length > 0 ? responsesWithTs[0]._ts : 0
 
   return {
@@ -266,11 +273,11 @@ export default function CatchUp() {
     Array.from(event.target.selectedOptions, (option) => option.value)
   )
 
-  const matchesFilter = (value: string, selectedValues: string[]) => {
+  const matchesFilter = useCallback((value: string, selectedValues: string[]) => {
     if (selectedValues.length === 0) return true
     const isSelected = selectedValues.includes(value)
     return filterMode === 'include' ? isSelected : !isSelected
-  }
+  }, [filterMode])
 
   const filteredTickets = useMemo(() => (
     tickets.filter((ticket) => (
@@ -281,7 +288,7 @@ export default function CatchUp() {
     ))
   ), [
     tickets,
-    filterMode,
+    matchesFilter,
     selectedBoards,
     selectedPriorities,
     selectedContacts,
@@ -467,7 +474,7 @@ export default function CatchUp() {
   }
 
   if (loading) {
-    return <div className="catchup-container"><p>Loading...</p></div>
+    return <CenteredLoadingBar label="Loading tickets..." />
   }
 
   if (loadError) {

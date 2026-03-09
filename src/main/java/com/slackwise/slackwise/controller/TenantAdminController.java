@@ -3,6 +3,8 @@ package com.slackwise.slackwise.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.slackwise.slackwise.model.RoutingRule;
 import com.slackwise.slackwise.model.TenantConfig;
@@ -27,8 +30,17 @@ public class TenantAdminController {
     @Autowired
     private AmazonService amazonService;
 
+    @Value("${company.id}")
+    private String defaultTenantId;
+
+    @GetMapping("/default")
+    public ResponseEntity<java.util.Map<String, String>> getDefaultTenant() {
+        return ResponseEntity.ok(java.util.Map.of("tenantId", defaultTenantId != null ? defaultTenantId : ""));
+    }
+
     @GetMapping("/{tenantId}")
     public ResponseEntity<TenantConfig> getTenantConfig(@PathVariable String tenantId) {
+        validateTenantAccess(tenantId);
         TenantConfig config = amazonService.getTenantConfig(tenantId);
         if (config == null) {
             return ResponseEntity.notFound().build();
@@ -38,6 +50,7 @@ public class TenantAdminController {
 
     @PutMapping("/{tenantId}")
     public ResponseEntity<TenantConfig> putTenantConfig(@PathVariable String tenantId, @RequestBody TenantConfig config) {
+        validateTenantAccess(tenantId);
         config.setTenantId(tenantId);
         amazonService.putTenantConfig(tenantId, config);
         return ResponseEntity.ok(config);
@@ -45,11 +58,13 @@ public class TenantAdminController {
 
     @GetMapping("/{tenantId}/rules")
     public ResponseEntity<List<RoutingRule>> listRoutingRules(@PathVariable String tenantId) {
+        validateTenantAccess(tenantId);
         return ResponseEntity.ok(amazonService.getRoutingRules(tenantId));
     }
 
     @PostMapping("/{tenantId}/rules")
     public ResponseEntity<RoutingRule> createRoutingRule(@PathVariable String tenantId, @RequestBody RoutingRule rule) {
+        validateTenantAccess(tenantId);
         RoutingRule created = amazonService.putRoutingRule(tenantId, rule);
         return ResponseEntity.ok(created);
     }
@@ -60,6 +75,7 @@ public class TenantAdminController {
         @PathVariable String ruleId,
         @RequestBody RoutingRule rule
     ) {
+        validateTenantAccess(tenantId);
         rule.setRuleId(ruleId);
         RoutingRule updated = amazonService.putRoutingRule(tenantId, rule);
         return ResponseEntity.ok(updated);
@@ -71,7 +87,18 @@ public class TenantAdminController {
         @PathVariable String ruleId,
         @RequestParam("priority") int priority
     ) {
+        validateTenantAccess(tenantId);
         amazonService.deleteRoutingRule(tenantId, priority, ruleId);
         return ResponseEntity.noContent().build();
+    }
+
+    private void validateTenantAccess(String tenantId) {
+        if (defaultTenantId == null || defaultTenantId.isBlank()) {
+            return;
+        }
+
+        if (!defaultTenantId.equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant access denied");
+        }
     }
 }

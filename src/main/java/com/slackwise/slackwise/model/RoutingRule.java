@@ -9,6 +9,14 @@ public class RoutingRule {
     private String matchSubject;
     private String matchSubjectRegex;
     private String targetChannelId;
+    private String targetAssigneeIdentifier;
+    private String primaryField;
+    private String primaryOperator;
+    private String primaryValue;
+    private String secondaryField;
+    private String secondaryOperator;
+    private String secondaryValue;
+    private String joinOperator;
 
     public String getRuleId() {
         return ruleId;
@@ -72,5 +80,69 @@ public class RoutingRule {
 
     public void setTargetChannelId(String targetChannelId) {
         this.targetChannelId = targetChannelId;
+    }
+
+    public String getTargetAssigneeIdentifier() {
+        return targetAssigneeIdentifier;
+    }
+
+    public void setTargetAssigneeIdentifier(String targetAssigneeIdentifier) {
+        this.targetAssigneeIdentifier = targetAssigneeIdentifier;
+    }
+
+    public String getPrimaryField() {
+        return primaryField;
+    }
+
+    public void setPrimaryField(String primaryField) {
+        this.primaryField = primaryField;
+    }
+
+    public String getPrimaryOperator() {
+        return primaryOperator;
+    }
+
+    public void setPrimaryOperator(String primaryOperator) {
+        this.primaryOperator = primaryOperator;
+    }
+
+    public String getPrimaryValue() {
+        return primaryValue;
+    }
+
+    public void setPrimaryValue(String primaryValue) {
+        this.primaryValue = primaryValue;
+    }
+
+    public String getSecondaryField() {
+        return secondaryField;
+    }
+
+    public void setSecondaryField(String secondaryField) {
+        this.secondaryField = secondaryField;
+    }
+
+    public String getSecondaryOperator() {
+        return secondaryOperator;
+    }
+
+    public void setSecondaryOperator(String secondaryOperator) {
+        this.secondaryOperator = secondaryOperator;
+    }
+
+    public String getSecondaryValue() {
+        return secondaryValue;
+    }
+
+    public void setSecondaryValue(String secondaryValue) {
+        this.secondaryValue = secondaryValue;
+    }
+
+    public String getJoinOperator() {
+        return joinOperator;
+    }
+
+    public void setJoinOperator(String joinOperator) {
+        this.joinOperator = joinOperator;
     }
 }
