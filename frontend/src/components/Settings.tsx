@@ -258,6 +258,16 @@ export default function Settings() {
     }
   }
 
+  const handleConnectSlackWorkspace = () => {
+    if (!tenantId || tenantId.trim().length === 0) {
+      setErrorMessage('Tenant ID is required before connecting Slack.')
+      return
+    }
+
+    const installUrl = `/api/slack/oauth/install?tenantId=${encodeURIComponent(tenantId.trim())}`
+    window.location.href = installUrl
+  }
+
   return (
     <div className="settings-container">
       <h1>Settings</h1>
@@ -323,6 +333,19 @@ export default function Settings() {
 
         <section className="settings-section">
           <h2>Slack</h2>
+          <p className="settings-hint">
+            Reinstall the Slack app for this workspace to rotate or refresh the bot token.
+          </p>
+          <div className="settings-inline-actions">
+            <button
+              type="button"
+              className="settings-btn settings-btn-primary"
+              onClick={handleConnectSlackWorkspace}
+              disabled={loading || saving || tenantId.length === 0}
+            >
+              Connect Slack Workspace
+            </button>
+          </div>
           <div className="settings-grid">
             <label className="field-group" htmlFor="slackTeamId">
               <span>Slack Team ID</span>

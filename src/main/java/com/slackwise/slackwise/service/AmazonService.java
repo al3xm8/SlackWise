@@ -19,9 +19,11 @@ import com.slackwise.slackwise.model.TenantConfig;
 
 import jakarta.annotation.PostConstruct;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClientBuilder;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
 @Service
@@ -39,10 +41,10 @@ public class AmazonService {
     // DynamoDB client
     private DynamoDbClient dynamoDb;
 
-    @Value("${aws.accessKeyId}")
+    @Value("${aws.accessKeyId:}")
     private String awsAccessKeyId;
 
-    @Value("${aws.secretAccessKey}")
+    @Value("${aws.secretAccessKey:}")
     private String awsSecretAccessKey;
 
     // DynamoDB table name
@@ -69,14 +71,22 @@ public class AmazonService {
     // Initialize DynamoDB client
     @PostConstruct
     public void init() {
-        dynamoDb = DynamoDbClient.builder()
-            .region(Region.of(awsRegion))
-            .credentialsProvider(
+        DynamoDbClientBuilder builder = DynamoDbClient.builder()
+            .region(Region.of(awsRegion));
+
+        if (!awsAccessKeyId.isBlank() && !awsSecretAccessKey.isBlank()) {
+            builder.credentialsProvider(
                 StaticCredentialsProvider.create(
                     AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)
                 )
-            )
-            .build();
+            );
+            log.warn("DynamoDB client initialized using static AWS access keys from configuration.");
+        } else {
+            builder.credentialsProvider(DefaultCredentialsProvider.create());
+            log.info("DynamoDB client initialized using AWS default credentials provider chain.");
+        }
+
+        dynamoDb = builder.build();
     } 
 
     /**

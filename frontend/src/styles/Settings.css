@@ -94,6 +94,16 @@
   font-size: 1.1rem;
 }
 
+.settings-hint {
+  margin: -0.2rem 0 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.settings-inline-actions {
+  margin-bottom: 0.9rem;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));

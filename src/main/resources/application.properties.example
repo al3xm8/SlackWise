@@ -1,0 +1,28 @@
+spring.application.name=slackwise
+
+# Slack
+slack.bot.token=${SLACK_BOT_TOKEN:}
+slack.channel.id=${SLACK_CHANNEL_ID:}
+slack.client.id=${SLACK_CLIENT_ID:}
+slack.client.secret=${SLACK_CLIENT_SECRET:}
+slack.oauth.redirect.uri=${SLACK_OAUTH_REDIRECT_URI:}
+slack.oauth.bot.scopes=${SLACK_OAUTH_BOT_SCOPES:chat:write,channels:read,channels:history,groups:history,commands,users:read}
+slack.oauth.user.scopes=${SLACK_OAUTH_USER_SCOPES:}
+
+# ConnectWise
+company.id=${COMPANY_ID:}
+company.idnumber=${COMPANY_ID_NUMBER:}
+public.key=${CONNECTWISE_PUBLIC_KEY:}
+private.key=${CONNECTWISE_PRIVATE_KEY:}
+client.id=${CONNECTWISE_CLIENT_ID:}
+
+# AWS / DynamoDB
+aws.region=${AWS_REGION:us-east-2}
+aws.dynamodb.table=${AWS_DYNAMODB_TABLE:}
+aws.accessKeyId=${AWS_ACCESS_KEY_ID:}
+aws.secretAccessKey=${AWS_SECRET_ACCESS_KEY:}
+
+# Assignment defaults
+lead.contact.name=${LEAD_CONTACT_NAME:}
+user.id=${DEFAULT_USER_ID:0}
+user.identifier=${DEFAULT_USER_IDENTIFIER:}
