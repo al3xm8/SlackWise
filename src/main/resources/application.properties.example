@@ -36,8 +36,10 @@ spring.security.oauth2.resourceserver.jwt.audiences=${OAUTH_AUDIENCE:}
 
 # Security Controls
 security.audit.enabled=${SECURITY_AUDIT_ENABLED:true}
+security.audit.persist.enabled=${SECURITY_AUDIT_PERSIST_ENABLED:true}
+security.audit.retention-days=${SECURITY_AUDIT_RETENTION_DAYS:30}
 security.rate-limit.enabled=${SECURITY_RATE_LIMIT_ENABLED:true}
+security.rate-limit.per-tenant.enabled=${SECURITY_RATE_LIMIT_PER_TENANT_ENABLED:true}
 security.rate-limit.window-seconds=${SECURITY_RATE_LIMIT_WINDOW_SECONDS:60}
 security.rate-limit.webhook-max-requests=${SECURITY_RATE_LIMIT_WEBHOOK_MAX_REQUESTS:120}
 security.rate-limit.auth-max-requests=${SECURITY_RATE_LIMIT_AUTH_MAX_REQUESTS:30}
-

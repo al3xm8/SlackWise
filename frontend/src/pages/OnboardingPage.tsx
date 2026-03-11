@@ -5,7 +5,8 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
 import SlackLogoIcon from '../components/SlackLogoIcon'
 import { apiFetch } from '../utils/apiClient'
 
@@ -302,6 +303,9 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
   return (
     <div className="onboarding-shell">
       <div className="onboarding-card reveal-up">
+        <Link to="/" className="setup-brand" aria-label="Back to landing page">
+          <BrandLogo alt="Dropwise" className="setup-brand-logo" />
+        </Link>
         <p className="onboarding-eyebrow">Onboarding</p>
         <h1>Welcome {userName || 'there'}, let&apos;s finish setup.</h1>
         <p className="onboarding-subtitle">
@@ -497,4 +501,7 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
     </div>
   )
 }
+
+
+
 

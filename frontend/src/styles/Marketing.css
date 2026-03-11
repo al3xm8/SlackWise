@@ -214,6 +214,17 @@
   margin-bottom: 0.35rem;
 }
 
+.setup-brand {
+  display: inline-flex;
+  line-height: 0;
+  margin-bottom: 0.85rem;
+}
+
+.setup-brand-logo {
+  height: 38px;
+  width: auto;
+}
+
 .auth-card p,
 .onboarding-subtitle {
   color: #36506b;
@@ -739,3 +750,6 @@
   background: var(--brand-input-bg);
   color: var(--brand-input-text);
 }
+
+
+

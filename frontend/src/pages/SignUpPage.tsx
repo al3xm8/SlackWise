@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
 import { hasOidcConfig, startOidcFlow } from '../utils/oidc'
 
 interface SignUpPayload {
@@ -64,6 +65,9 @@ export default function SignUpPage({ onSignUp }: SignUpPageProps) {
   return (
     <div className="auth-shell">
       <div className="auth-card reveal-up">
+        <Link to="/" className="setup-brand" aria-label="Back to landing page">
+          <BrandLogo alt="Dropwise" className="setup-brand-logo" />
+        </Link>
         <h1>Create your account</h1>
         <p>Start your free workspace and complete setup in a few minutes.</p>
 
@@ -144,3 +148,6 @@ export default function SignUpPage({ onSignUp }: SignUpPageProps) {
     </div>
   )
 }
+
+
+

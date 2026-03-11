@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slackwise.slackwise.service.AmazonService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,9 +27,22 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AuditLoggingFilter.class);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RequestTenantResolver requestTenantResolver;
+    private final AmazonService amazonService;
 
     @Value("${security.audit.enabled:true}")
     private boolean auditEnabled;
+
+    @Value("${security.audit.persist.enabled:true}")
+    private boolean auditPersistEnabled;
+
+    @Value("${security.audit.retention-days:30}")
+    private long auditRetentionDays;
+
+    public AuditLoggingFilter(RequestTenantResolver requestTenantResolver, AmazonService amazonService) {
+        this.requestTenantResolver = requestTenantResolver;
+        this.amazonService = amazonService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -72,6 +86,10 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
                 statusCode = 500;
             }
 
+            String tenantScope = requestTenantResolver.resolveTenantScope(request);
+            String clientIp = resolveClientIp(request);
+            String principal = resolvePrincipal();
+
             Map<String, Object> auditEvent = new LinkedHashMap<>();
             auditEvent.put("event", "api_audit");
             auditEvent.put("timestamp", Instant.now().toString());
@@ -82,10 +100,10 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
             auditEvent.put("query", request.getQueryString());
             auditEvent.put("status", statusCode);
             auditEvent.put("durationMs", durationMs);
-            auditEvent.put("clientIp", resolveClientIp(request));
+            auditEvent.put("clientIp", clientIp);
             auditEvent.put("userAgent", request.getHeader("User-Agent"));
-            auditEvent.put("tenantId", resolveTenantId(request));
-            auditEvent.put("principal", resolvePrincipal());
+            auditEvent.put("tenantScope", tenantScope);
+            auditEvent.put("principal", principal);
             auditEvent.put("rateLimited", statusCode == 429);
 
             if (thrown != null) {
@@ -94,6 +112,30 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
             }
 
             log.info(objectMapper.writeValueAsString(auditEvent));
+
+            if (auditPersistEnabled) {
+                try {
+                    amazonService.putAuditEvent(
+                        tenantScope,
+                        requestId,
+                        routeGroup,
+                        request.getMethod(),
+                        request.getRequestURI(),
+                        request.getQueryString(),
+                        statusCode,
+                        durationMs,
+                        clientIp,
+                        request.getHeader("User-Agent"),
+                        principal,
+                        statusCode == 429,
+                        thrown != null ? thrown.getClass().getSimpleName() : null,
+                        thrown != null ? thrown.getMessage() : null,
+                        auditRetentionDays
+                    );
+                } catch (Exception persistError) {
+                    log.warn("Failed to persist audit event requestId={} routeGroup={}", requestId, routeGroup, persistError);
+                }
+            }
         }
     }
 
@@ -103,20 +145,6 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
             return incoming.trim();
         }
         return UUID.randomUUID().toString();
-    }
-
-    private String resolveTenantId(HttpServletRequest request) {
-        String fromHeader = request.getHeader("X-Tenant-Id");
-        if (fromHeader != null && !fromHeader.isBlank()) {
-            return fromHeader.trim();
-        }
-
-        String fromQuery = request.getParameter("tenantId");
-        if (fromQuery != null && !fromQuery.isBlank()) {
-            return fromQuery.trim();
-        }
-
-        return "";
     }
 
     private String resolvePrincipal() {
@@ -149,4 +177,3 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
         return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
     }
 }
-

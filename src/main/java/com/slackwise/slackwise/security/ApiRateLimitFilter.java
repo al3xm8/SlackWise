@@ -27,6 +27,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ConcurrentHashMap<String, RequestCounter> counters = new ConcurrentHashMap<>();
+    private final RequestTenantResolver requestTenantResolver;
 
     @Value("${security.rate-limit.enabled:true}")
     private boolean rateLimitEnabled;
@@ -40,7 +41,14 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     @Value("${security.rate-limit.auth-max-requests:30}")
     private int authMaxRequests;
 
+    @Value("${security.rate-limit.per-tenant.enabled:true}")
+    private boolean perTenantRateLimitEnabled;
+
     private volatile long lastCleanupEpochSeconds = 0L;
+
+    public ApiRateLimitFilter(RequestTenantResolver requestTenantResolver) {
+        this.requestTenantResolver = requestTenantResolver;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -67,7 +75,8 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         cleanupStaleCounters(now);
 
         String clientIp = resolveClientIp(request);
-        String key = routeGroup + ":" + clientIp;
+        String tenantScope = perTenantRateLimitEnabled ? requestTenantResolver.resolveTenantScope(request) : "GLOBAL";
+        String key = routeGroup + ":" + tenantScope + ":" + clientIp;
 
         RequestCounter counter = counters.compute(key, (ignored, existing) -> {
             if (existing == null || now - existing.windowStartedEpochSeconds >= windowSeconds) {
@@ -85,6 +94,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         response.setHeader("X-RateLimit-Limit", String.valueOf(maxRequests));
         response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
         response.setHeader("X-RateLimit-Reset", String.valueOf(resetEpoch));
+        response.setHeader("X-RateLimit-Tenant-Scope", tenantScope);
 
         if (currentCount > maxRequests) {
             long retryAfter = Math.max(1, resetEpoch - now);
@@ -95,11 +105,19 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             objectMapper.writeValue(response.getWriter(), Map.of(
                 "error", "Rate limit exceeded",
                 "routeGroup", routeGroup,
+                "tenantScope", tenantScope,
                 "retryAfterSeconds", retryAfter
             ));
 
-            log.warn("Rate limit exceeded for routeGroup={} clientIp={} currentCount={} maxRequests={} windowSeconds={}",
-                routeGroup, clientIp, currentCount, maxRequests, windowSeconds);
+            log.warn(
+                "Rate limit exceeded for routeGroup={} tenantScope={} clientIp={} currentCount={} maxRequests={} windowSeconds={}",
+                routeGroup,
+                tenantScope,
+                clientIp,
+                currentCount,
+                maxRequests,
+                windowSeconds
+            );
             return;
         }
 

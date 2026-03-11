@@ -36,6 +36,7 @@ public class AmazonService {
     private static final String SK_PREFIX_RULE = "RULE#";
     private static final String SK_PREFIX_TICKET = "TICKET#";
     private static final String SK_PREFIX_WEBHOOK_EVENT = "WEBHOOK_EVENT#";
+    private static final String SK_PREFIX_AUDIT = "AUDIT#";
     // AWS configuration properties
     @Value("${aws.region}")
     private String awsRegion;
@@ -72,6 +73,10 @@ public class AmazonService {
 
     private static String webhookEventSk(String eventId) {
         return SK_PREFIX_WEBHOOK_EVENT + eventId;
+    }
+
+    private static String auditSk(long epochMillis) {
+        return SK_PREFIX_AUDIT + epochMillis + "#" + UUID.randomUUID();
     }
 
     // Initialize DynamoDB client
@@ -323,6 +328,80 @@ public class AmazonService {
         } catch (DynamoDbException e) {
             log.error("Failed to register webhook event_id={} for tenantId={}", eventId, tenantId, e);
             return true;
+        }
+    }
+    /**
+     * Persist structured API audit events for security-sensitive routes.
+     *
+     * @param tenantId tenant scope, defaults to GLOBAL when blank
+     * @param requestId unique request id
+     * @param routeGroup route classification (webhook/auth)
+     * @param method HTTP method
+     * @param path request path
+     * @param query query string
+     * @param status HTTP status code
+     * @param durationMs request duration in milliseconds
+     * @param clientIp client ip address
+     * @param userAgent user agent
+     * @param principal authenticated principal or anonymous
+     * @param rateLimited true when HTTP 429
+     * @param exception exception simple name when available
+     * @param exceptionMessage exception message when available
+     * @param retentionDays ttl retention window in days
+     */
+    public void putAuditEvent(
+        String tenantId,
+        String requestId,
+        String routeGroup,
+        String method,
+        String path,
+        String query,
+        int status,
+        long durationMs,
+        String clientIp,
+        String userAgent,
+        String principal,
+        boolean rateLimited,
+        String exception,
+        String exceptionMessage,
+        long retentionDays
+    ) {
+        if (tableName == null || tableName.isBlank()) {
+            return;
+        }
+        String tenantScope = tenantId != null && !tenantId.isBlank() ? tenantId.trim() : "GLOBAL";
+        long nowEpoch = Instant.now().getEpochSecond();
+        long retentionSeconds = Math.max(1L, retentionDays) * 86400L;
+
+        Map<String, AttributeValue> item = new java.util.HashMap<>();
+        item.put("tenantId", AttributeValue.builder().s(tenantScope).build());
+        item.put("sk", AttributeValue.builder().s(auditSk(Instant.now().toEpochMilli())).build());
+        item.put("itemType", AttributeValue.builder().s("AUDIT_EVENT").build());
+        item.put("createdAt", AttributeValue.builder().s(Instant.now().toString()).build());
+        item.put("expiresAtEpoch", AttributeValue.builder().n(String.valueOf(nowEpoch + retentionSeconds)).build());
+
+        if (requestId != null && !requestId.isBlank()) item.put("requestId", AttributeValue.builder().s(requestId).build());
+        if (routeGroup != null && !routeGroup.isBlank()) item.put("routeGroup", AttributeValue.builder().s(routeGroup).build());
+        if (method != null && !method.isBlank()) item.put("method", AttributeValue.builder().s(method).build());
+        if (path != null && !path.isBlank()) item.put("path", AttributeValue.builder().s(path).build());
+        if (query != null && !query.isBlank()) item.put("query", AttributeValue.builder().s(query).build());
+        if (clientIp != null && !clientIp.isBlank()) item.put("clientIp", AttributeValue.builder().s(clientIp).build());
+        if (userAgent != null && !userAgent.isBlank()) item.put("userAgent", AttributeValue.builder().s(userAgent).build());
+        if (principal != null && !principal.isBlank()) item.put("principal", AttributeValue.builder().s(principal).build());
+        if (exception != null && !exception.isBlank()) item.put("exception", AttributeValue.builder().s(exception).build());
+        if (exceptionMessage != null && !exceptionMessage.isBlank()) item.put("exceptionMessage", AttributeValue.builder().s(exceptionMessage).build());
+
+        item.put("status", AttributeValue.builder().n(String.valueOf(status)).build());
+        item.put("durationMs", AttributeValue.builder().n(String.valueOf(Math.max(0L, durationMs))).build());
+        item.put("rateLimited", AttributeValue.builder().bool(rateLimited).build());
+
+        try {
+            dynamoDb.putItem(PutItemRequest.builder()
+                .tableName(tableName)
+                .item(item)
+                .build());
+        } catch (DynamoDbException e) {
+            log.error("Failed to persist audit event requestId={} tenantScope={}", requestId, tenantScope, e);
         }
     }
     /**
@@ -632,4 +711,5 @@ public class AmazonService {
     }
 
 }
+
 

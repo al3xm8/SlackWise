@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
 import { hasOidcConfig, startOidcFlow } from '../utils/oidc'
 
 interface SignInPayload {
@@ -62,6 +63,9 @@ export default function SignInPage({ onSignIn }: SignInPageProps) {
   return (
     <div className="auth-shell">
       <div className="auth-card reveal-up">
+        <Link to="/" className="setup-brand" aria-label="Back to landing page">
+          <BrandLogo alt="Dropwise" className="setup-brand-logo" />
+        </Link>
         <h1>Sign in</h1>
         <p>Use your workspace account to continue.</p>
 
@@ -132,3 +136,6 @@ export default function SignInPage({ onSignIn }: SignInPageProps) {
     </div>
   )
 }
+
+
+
