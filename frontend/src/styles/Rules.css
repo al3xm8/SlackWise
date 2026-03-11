@@ -103,6 +103,7 @@
 .form-actions {
   display: flex;
   justify-content: flex-start;
+  gap: 0.6rem;
 }
 
 .form-actions button,
@@ -119,6 +120,11 @@
 .form-actions button {
   background: var(--accent-strong);
   color: #fff;
+}
+
+.form-actions .secondary-btn {
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .form-actions button:disabled,
@@ -207,3 +213,143 @@
     min-width: 0;
   }
 }
+
+/* Marketing Theme Overrides */
+.rules-container {
+  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Segoe UI', sans-serif;
+  color: #0f2742;
+}
+
+.rules-container h1 {
+  color: #0f2742;
+  font-weight: 700;
+}
+
+.rules-container > p,
+.actions-line span,
+.rule-meta,
+.preview,
+.message {
+  color: #36506b;
+}
+
+.rules-card,
+.saved-rule {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(171, 198, 226, 0.6);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(15, 39, 66, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.saved-rule.disabled {
+  background: #eef5ff;
+}
+
+.rules-card h2 {
+  color: #0f5cbc;
+}
+
+.tenant-row input,
+.rule-line input,
+.rule-line select {
+  border: 1px solid #bed7ef;
+  background: #fafdff;
+  color: #102f4c;
+}
+
+.form-actions button,
+.secondary-btn,
+.danger-btn {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.form-actions button {
+  background: linear-gradient(120deg, #1776e1 0%, #0f5cbc 100%);
+  box-shadow: 0 8px 20px rgba(15, 92, 188, 0.22);
+}
+
+.form-actions .secondary-btn,
+.secondary-btn {
+  background: #f1f7ff;
+  color: #0f4f93;
+  border: 1px solid #b8d6f4;
+}
+
+.danger-btn {
+  background: #ffe8ec;
+  color: #b22f39;
+  border: 1px solid #f5bbc4;
+}
+
+/* Theme Token Overrides */
+.rules-container {
+  color: var(--brand-body);
+}
+
+.rules-container h1,
+.rules-card h2,
+.tenant-fixed,
+.rule-summary,
+.tenant-row label,
+.toggle-row label {
+  color: var(--brand-heading);
+}
+
+.rules-container > p,
+.actions-line span,
+.rule-meta,
+.preview,
+.message {
+  color: var(--brand-body);
+}
+
+.rules-card,
+.saved-rule {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.saved-rule.disabled {
+  background: var(--row-hover-bg);
+}
+
+.preview {
+  background: var(--panel-soft-bg);
+  border-color: var(--panel-soft-border);
+}
+
+.tenant-row input,
+.rule-line input,
+.rule-line select {
+  border: 1px solid var(--brand-input-border);
+  background: var(--brand-input-bg);
+  color: var(--brand-input-text);
+}
+
+.form-actions button,
+.secondary-btn,
+.danger-btn {
+  border-radius: 999px;
+}
+
+.form-actions button {
+  background: var(--brand-primary-gradient);
+  box-shadow: var(--brand-primary-shadow);
+}
+
+.form-actions .secondary-btn,
+.secondary-btn {
+  background: var(--brand-secondary-bg);
+  color: var(--brand-secondary-text);
+  border: 1px solid var(--brand-secondary-border);
+}
+
+.danger-btn {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+}
+

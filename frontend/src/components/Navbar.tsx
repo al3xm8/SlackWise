@@ -1,37 +1,43 @@
 import { Link, NavLink } from 'react-router-dom'
+import BrandLogo from './BrandLogo'
 import '../styles/Navbar.css'
 
-export default function Navbar() {
+interface NavbarProps {
+  onSignOut: () => void
+}
+
+export default function Navbar({ onSignOut }: NavbarProps) {
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="navbar-brand">
-          <img
-            src="/wisedrop-logo-horizontal.svg"
-            alt="Wisedrop"
-            className="navbar-brand-logo"
-          />
+        <Link to="/app/dashboard" className="navbar-brand">
+          <BrandLogo alt="Dropwise" className="navbar-brand-logo" />
         </Link>
         <ul className="navbar-menu">
           <li>
-            <NavLink to="/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <NavLink to="/app/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Dashboard
             </NavLink>
           </li>
           <li>
-            <NavLink to="/catchup" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <NavLink to="/app/catchup" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Catch Up
             </NavLink>
           </li>
           <li>
-            <NavLink to="/rules" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <NavLink to="/app/rules" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Rules
             </NavLink>
           </li>
           <li>
-            <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <NavLink to="/app/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               Settings
             </NavLink>
+          </li>
+          <li>
+            <button type="button" className="nav-link nav-link-button" onClick={onSignOut}>
+              Sign out
+            </button>
           </li>
         </ul>
       </div>

@@ -1,9 +1,16 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import '../styles/Rules.css'
+import { apiFetch } from '../utils/apiClient'
 
 type FieldOption = 'SUBJECT' | 'CONTACT' | 'COMPANY_ID'
-type OperatorOption = 'CONTAINS' | 'EQUALS'
+type OperatorOption = 'CONTAINS' | 'EQUALS' | 'NOT_EQUALS'
 type JoinOption = 'AND' | 'OR'
+
+interface RuleCondition {
+  field: FieldOption
+  operator: OperatorOption
+  value: string
+}
 
 interface RoutingRule {
   ruleId: string
@@ -19,19 +26,14 @@ interface RoutingRule {
   secondaryOperator?: OperatorOption
   secondaryValue?: string
   joinOperator?: JoinOption
+  conditions?: RuleCondition[]
   matchContact?: string
   matchSubject?: string
   matchSubjectRegex?: string
 }
 
 interface RuleFormState {
-  primaryField: FieldOption
-  primaryOperator: OperatorOption
-  primaryValue: string
-  withSecondary: boolean
-  secondaryField: FieldOption
-  secondaryOperator: OperatorOption
-  secondaryValue: string
+  conditions: RuleCondition[]
   joinOperator: JoinOption
   targetChannelId: string
   targetAssigneeIdentifier: string
@@ -46,16 +48,17 @@ const fieldLabels: Record<FieldOption, string> = {
 const operatorLabels: Record<OperatorOption, string> = {
   CONTAINS: 'contains',
   EQUALS: 'equals',
+  NOT_EQUALS: 'does not equal',
 }
 
+const createDefaultCondition = (): RuleCondition => ({
+  field: 'SUBJECT',
+  operator: 'CONTAINS',
+  value: '',
+})
+
 const initialFormState: RuleFormState = {
-  primaryField: 'SUBJECT',
-  primaryOperator: 'CONTAINS',
-  primaryValue: '',
-  withSecondary: false,
-  secondaryField: 'CONTACT',
-  secondaryOperator: 'EQUALS',
-  secondaryValue: '',
+  conditions: [createDefaultCondition()],
   joinOperator: 'AND',
   targetChannelId: '',
   targetAssigneeIdentifier: '',
@@ -65,6 +68,7 @@ export default function Rules() {
   const [tenantId, setTenantId] = useState('')
   const [rules, setRules] = useState<RoutingRule[]>([])
   const [form, setForm] = useState<RuleFormState>(initialFormState)
+  const [editingRule, setEditingRule] = useState<RoutingRule | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,7 +83,7 @@ export default function Rules() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        const response = await fetch('/api/tenants/default')
+        const response = await apiFetch('/api/tenants/default')
         if (!response.ok) {
           setError('Could not load default tenant. Enter tenant ID manually.')
           return
@@ -111,7 +115,7 @@ export default function Rules() {
     setError(null)
     setActionError(null)
     try {
-      const response = await fetch(`/api/tenants/${encodeURIComponent(trimmedTenant)}/rules`)
+      const response = await apiFetch(`/api/tenants/${encodeURIComponent(trimmedTenant)}/rules`)
       if (!response.ok) {
         throw new Error('Failed to load rules from AWS.')
       }
@@ -128,13 +132,18 @@ export default function Rules() {
     }
   }
 
-  const handleCreateRule = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveRule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setActionError(null)
     setSuccessMessage(null)
 
-    const primaryValue = form.primaryValue.trim()
-    const secondaryValue = form.secondaryValue.trim()
+    const normalizedConditions = form.conditions
+      .map((condition) => ({
+        ...condition,
+        value: condition.value.trim(),
+      }))
+      .filter((condition) => condition.value.length > 0)
+
     const targetChannelId = form.targetChannelId.trim()
     const targetAssigneeIdentifier = form.targetAssigneeIdentifier.trim()
 
@@ -142,58 +151,122 @@ export default function Rules() {
       setActionError('Tenant ID is required.')
       return
     }
-    if (!primaryValue) {
-      setActionError('Primary rule value is required.')
+    if (normalizedConditions.length === 0) {
+      setActionError('At least one condition is required.')
+      return
+    }
+    if (normalizedConditions.length !== form.conditions.length) {
+      setActionError('Every condition requires a value.')
       return
     }
     if (!targetChannelId && !targetAssigneeIdentifier) {
       setActionError('Set a destination channel, assignee, or both.')
       return
     }
-    if (form.withSecondary && !secondaryValue) {
-      setActionError('Secondary rule value is required when using a second condition.')
-      return
-    }
+
+    const firstCondition = normalizedConditions[0]
+    const secondCondition = normalizedConditions[1]
 
     const payload: Partial<RoutingRule> = {
-      priority: nextPriority,
-      enabled: true,
-      primaryField: form.primaryField,
-      primaryOperator: form.primaryOperator,
-      primaryValue,
+      priority: editingRule ? editingRule.priority : nextPriority,
+      enabled: editingRule ? editingRule.enabled : true,
+      conditions: normalizedConditions,
+      primaryField: firstCondition?.field,
+      primaryOperator: firstCondition?.operator,
+      primaryValue: firstCondition?.value,
       targetChannelId: targetChannelId || undefined,
       targetAssigneeIdentifier: targetAssigneeIdentifier || undefined,
-      joinOperator: form.withSecondary ? form.joinOperator : undefined,
-      secondaryField: form.withSecondary ? form.secondaryField : undefined,
-      secondaryOperator: form.withSecondary ? form.secondaryOperator : undefined,
-      secondaryValue: form.withSecondary ? secondaryValue : undefined,
+      joinOperator: normalizedConditions.length > 1 ? form.joinOperator : undefined,
+      secondaryField: secondCondition?.field,
+      secondaryOperator: secondCondition?.operator,
+      secondaryValue: secondCondition?.value,
     }
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/tenants/${encodeURIComponent(tenantId.trim())}/rules`, {
-        method: 'POST',
+      const isEditing = editingRule != null
+      const endpoint = isEditing
+        ? `/api/tenants/${encodeURIComponent(tenantId.trim())}/rules/${encodeURIComponent(editingRule.ruleId)}`
+        : `/api/tenants/${encodeURIComponent(tenantId.trim())}/rules`
+
+      const response = await apiFetch(endpoint, {
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!response.ok) {
-        throw new Error('Failed to create rule.')
+        throw new Error(isEditing ? 'Failed to update rule.' : 'Failed to create rule.')
       }
       setForm(initialFormState)
+      setEditingRule(null)
       await loadRules(tenantId)
-      setSuccessMessage('Rule created and stored in AWS.')
+      setSuccessMessage(isEditing ? 'Rule updated.' : 'Rule created and stored in AWS.')
     } catch (err: unknown) {
-      setActionError(readErrorMessage(err, 'Failed to create rule.'))
+      setActionError(readErrorMessage(err, editingRule ? 'Failed to update rule.' : 'Failed to create rule.'))
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleEditRule = (rule: RoutingRule) => {
+    const conditions = getRuleConditions(rule)
+    setForm({
+      conditions: conditions.length > 0 ? conditions.map((condition) => ({ ...condition })) : [createDefaultCondition()],
+      joinOperator: rule.joinOperator === 'OR' ? 'OR' : 'AND',
+      targetChannelId: rule.targetChannelId ?? '',
+      targetAssigneeIdentifier: rule.targetAssigneeIdentifier ?? '',
+    })
+    setEditingRule(rule)
+    setActionError(null)
+    setSuccessMessage(null)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingRule(null)
+    setForm(initialFormState)
+    setActionError(null)
+  }
+
+  const handleConditionChange = (
+    index: number,
+    key: keyof RuleCondition,
+    value: string,
+  ) => {
+    setForm((current) => {
+      const updated = current.conditions.map((condition, conditionIndex) =>
+        conditionIndex === index ? { ...condition, [key]: value } : condition,
+      )
+      return {
+        ...current,
+        conditions: updated,
+      }
+    })
+  }
+
+  const handleAddCondition = () => {
+    setForm((current) => ({
+      ...current,
+      conditions: [...current.conditions, createDefaultCondition()],
+    }))
+  }
+
+  const handleRemoveCondition = (index: number) => {
+    setForm((current) => {
+      if (current.conditions.length <= 1) {
+        return current
+      }
+      return {
+        ...current,
+        conditions: current.conditions.filter((_, conditionIndex) => conditionIndex !== index),
+      }
+    })
   }
 
   const handleToggleRule = async (rule: RoutingRule) => {
     setActionError(null)
     setSuccessMessage(null)
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/tenants/${encodeURIComponent(tenantId.trim())}/rules/${encodeURIComponent(rule.ruleId)}`,
         {
           method: 'PUT',
@@ -215,7 +288,7 @@ export default function Rules() {
     setActionError(null)
     setSuccessMessage(null)
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/tenants/${encodeURIComponent(tenantId.trim())}/rules/${encodeURIComponent(rule.ruleId)}?priority=${rule.priority}`,
         { method: 'DELETE' },
       )
@@ -230,15 +303,16 @@ export default function Rules() {
   }
 
   const sentencePreview = useMemo(() => {
-    const primaryValue = form.primaryValue.trim() || '...'
-    const secondaryClause = form.withSecondary
-      ? ` ${form.joinOperator} ${fieldLabels[form.secondaryField]} ${operatorLabels[form.secondaryOperator]} "${form.secondaryValue.trim() || '...'}"`
-      : ''
+    const conditionPreview = form.conditions
+      .map((condition) =>
+        `${fieldLabels[condition.field]} ${operatorLabels[condition.operator]} "${condition.value.trim() || '...'}"`,
+      )
+      .join(` ${form.joinOperator} `)
 
     const destination = form.targetChannelId.trim() || '[destination]'
     const assignee = form.targetAssigneeIdentifier.trim() || '[user]'
 
-    return `If ${fieldLabels[form.primaryField]} ${operatorLabels[form.primaryOperator]} "${primaryValue}"${secondaryClause}, send ticket to ${destination} and assign ticket to ${assignee}.`
+    return `If ${conditionPreview}, send ticket to ${destination} and assign ticket to ${assignee}.`
   }, [form])
 
   return (
@@ -252,74 +326,58 @@ export default function Rules() {
       </section>
 
       <section className="rules-card">
-        <h2>Create Rule</h2>
-        <form className="rule-form" onSubmit={handleCreateRule}>
-          <div className="rule-line">
-            <span>If</span>
-            <select
-              value={form.primaryField}
-              onChange={(event) => setForm((current) => ({ ...current, primaryField: event.target.value as FieldOption }))}
-            >
-              <option value="SUBJECT">Ticket Subject</option>
-              <option value="CONTACT">Contact Name</option>
-              <option value="COMPANY_ID">Company ID</option>
-            </select>
-            <select
-              value={form.primaryOperator}
-              onChange={(event) => setForm((current) => ({ ...current, primaryOperator: event.target.value as OperatorOption }))}
-            >
-              <option value="CONTAINS">contains</option>
-              <option value="EQUALS">equals</option>
-            </select>
-            <input
-              value={form.primaryValue}
-              onChange={(event) => setForm((current) => ({ ...current, primaryValue: event.target.value }))}
-              placeholder="value"
-            />
-          </div>
-
-          <div className="toggle-row">
-            <label>
-              <input
-                type="checkbox"
-                checked={form.withSecondary}
-                onChange={(event) => setForm((current) => ({ ...current, withSecondary: event.target.checked }))}
-              />
-              Add a second condition
-            </label>
-          </div>
-
-          {form.withSecondary ? (
-            <div className="rule-line">
+        <h2>{editingRule ? 'Edit Rule' : 'Create Rule'}</h2>
+        <form className="rule-form" onSubmit={handleSaveRule}>
+          {form.conditions.map((condition, index) => (
+            <div className="rule-line" key={index}>
+              <span>{index === 0 ? 'If' : form.joinOperator}</span>
               <select
-                value={form.joinOperator}
-                onChange={(event) => setForm((current) => ({ ...current, joinOperator: event.target.value as JoinOption }))}
-              >
-                <option value="AND">AND</option>
-                <option value="OR">OR</option>
-              </select>
-              <select
-                value={form.secondaryField}
-                onChange={(event) => setForm((current) => ({ ...current, secondaryField: event.target.value as FieldOption }))}
+                value={condition.field}
+                onChange={(event) => handleConditionChange(index, 'field', event.target.value)}
               >
                 <option value="SUBJECT">Ticket Subject</option>
                 <option value="CONTACT">Contact Name</option>
                 <option value="COMPANY_ID">Company ID</option>
               </select>
               <select
-                value={form.secondaryOperator}
-                onChange={(event) => setForm((current) => ({ ...current, secondaryOperator: event.target.value as OperatorOption }))}
+                value={condition.operator}
+                onChange={(event) => handleConditionChange(index, 'operator', event.target.value)}
               >
                 <option value="CONTAINS">contains</option>
                 <option value="EQUALS">equals</option>
+                <option value="NOT_EQUALS">does not equal</option>
               </select>
               <input
-                value={form.secondaryValue}
-                onChange={(event) => setForm((current) => ({ ...current, secondaryValue: event.target.value }))}
+                value={condition.value}
+                onChange={(event) => handleConditionChange(index, 'value', event.target.value)}
                 placeholder="value"
               />
+              {form.conditions.length > 1 ? (
+                <button type="button" className="danger-btn" onClick={() => handleRemoveCondition(index)}>
+                  Remove
+                </button>
+              ) : null}
             </div>
-          ) : null}
+          ))}
+
+          <div className="rule-line">
+            <button type="button" className="secondary-btn" onClick={handleAddCondition}>
+              Add condition
+            </button>
+            {form.conditions.length > 1 ? (
+              <>
+                <span>Use</span>
+                <select
+                  value={form.joinOperator}
+                  onChange={(event) => setForm((current) => ({ ...current, joinOperator: event.target.value as JoinOption }))}
+                >
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                </select>
+                <span>between all conditions</span>
+              </>
+            ) : null}
+          </div>
 
           <div className="rule-line actions-line">
             <span>send ticket to</span>
@@ -340,8 +398,17 @@ export default function Rules() {
 
           <div className="form-actions">
             <button type="submit" disabled={saving || loading}>
-              {saving ? 'Saving...' : `Create Rule (priority ${nextPriority})`}
+              {saving
+                ? 'Saving...'
+                : editingRule
+                  ? `Save Rule #${editingRule.priority}`
+                  : `Create Rule (priority ${nextPriority})`}
             </button>
+            {editingRule ? (
+              <button type="button" className="secondary-btn" onClick={handleCancelEdit} disabled={saving}>
+                Cancel Edit
+              </button>
+            ) : null}
           </div>
         </form>
         {actionError ? <p className="message error">{actionError}</p> : null}
@@ -364,6 +431,9 @@ export default function Rules() {
                   <span>Rule ID: {rule.ruleId}</span>
                 </div>
                 <div className="rule-actions">
+                  <button type="button" className="secondary-btn" onClick={() => handleEditRule(rule)}>
+                    Edit
+                  </button>
                   <button type="button" className="secondary-btn" onClick={() => handleToggleRule(rule)}>
                     {rule.enabled ? 'Disable' : 'Enable'}
                   </button>
@@ -385,11 +455,13 @@ function readErrorMessage(error: unknown, fallback: string): string {
 }
 
 function renderRuleSummary(rule: RoutingRule): string {
-  const sentencePrimary = buildSentenceCondition(rule.primaryField, rule.primaryOperator, rule.primaryValue)
-  if (sentencePrimary) {
-    const sentenceSecondary = buildSentenceCondition(rule.secondaryField, rule.secondaryOperator, rule.secondaryValue)
+  const sentenceConditions = getRuleConditions(rule)
+    .map((condition) => buildSentenceCondition(condition.field, condition.operator, condition.value))
+    .filter((condition): condition is string => Boolean(condition))
+
+  if (sentenceConditions.length > 0) {
     const joiner = rule.joinOperator === 'OR' ? 'OR' : 'AND'
-    const combinedCondition = sentenceSecondary ? `${sentencePrimary} ${joiner} ${sentenceSecondary}` : sentencePrimary
+    const combinedCondition = sentenceConditions.join(` ${joiner} `)
     const destination = rule.targetChannelId ? rule.targetChannelId : '[no destination]'
     const assignee = rule.targetAssigneeIdentifier ? rule.targetAssigneeIdentifier : '[no assignee]'
     return `If ${combinedCondition}, send to ${destination} and assign to ${assignee}.`
@@ -404,6 +476,31 @@ function renderRuleSummary(rule: RoutingRule): string {
   return `If ${legacyCondition}, send to ${destination}.`
 }
 
+function getRuleConditions(rule: RoutingRule): RuleCondition[] {
+  if (Array.isArray(rule.conditions) && rule.conditions.length > 0) {
+    return rule.conditions.filter((condition) =>
+      Boolean(condition?.field && condition?.operator && condition?.value),
+    )
+  }
+
+  const fallback: RuleCondition[] = []
+  if (rule.primaryField && rule.primaryOperator && rule.primaryValue) {
+    fallback.push({
+      field: rule.primaryField,
+      operator: rule.primaryOperator,
+      value: rule.primaryValue,
+    })
+  }
+  if (rule.secondaryField && rule.secondaryOperator && rule.secondaryValue) {
+    fallback.push({
+      field: rule.secondaryField,
+      operator: rule.secondaryOperator,
+      value: rule.secondaryValue,
+    })
+  }
+  return fallback
+}
+
 function buildSentenceCondition(field?: FieldOption, operator?: OperatorOption, value?: string): string | null {
   if (!field || !operator || !value) {
     return null
@@ -412,3 +509,4 @@ function buildSentenceCondition(field?: FieldOption, operator?: OperatorOption, 
   const prettyOperator = operatorLabels[operator] || operator.toLowerCase()
   return `${prettyField} ${prettyOperator} "${value}"`
 }
+

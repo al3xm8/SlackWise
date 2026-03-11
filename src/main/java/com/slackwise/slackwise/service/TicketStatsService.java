@@ -21,95 +21,61 @@ public class TicketStatsService {
     private ConnectwiseService connectwiseService;
 
     /**
-     * Aggregate ticket statistics for dashboard.
-     * @param tenantId
-     * @return Map with stats: averageResponseTime, totalTicketsOpen, closedTodayCount, ticketsInProgress
+     * Aggregate ticket statistics for dashboard across all tracked company IDs.
+     *
+     * @param trackedCompanyIds ConnectWise company IDs/identifiers to include
+     * @return Map with stats: averageResponseTime, totalTicketsOpen, pendingClientResponse, pendingInternalResponse
      */
-    public Map<String, Object> getTicketStats(String tenantId) {
+    public Map<String, Object> getTicketStats(List<String> trackedCompanyIds) {
         Map<String, Object> stats = new HashMap<>();
 
         int pendingClientResponse = 0;
         int pendingInternalResponse = 0;
         int openTickets = 0;
-        
-        double avgResponseTime = 0;
+
         int responseCount = 0;
-        
         double totalResponseTime = 0;
-        
+
         HashMap<String, Integer> ticketStatuses = new HashMap<>();
         HashMap<String, Integer> ticketContacts = new HashMap<>();
         HashMap<String, Integer> ticketBoards = new HashMap<>();
-        
-        
-        
+
         try {
-            List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyId(tenantId);
-            // For simplicity, we'll just count open tickets and pending responses here.
+            List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyIds(trackedCompanyIds);
             openTickets = tickets.size();
-            
+
             for (Ticket ticket : tickets) {
                 String boardName = ticket.getBoardName();
                 ticketBoards.put(boardName, ticketBoards.getOrDefault(boardName, 0) + 1);
-                
-                // Check the last time entry to determine if we're waiting on a client or internal response
-                if (ticket.getDiscussion() == null || ticket.getDiscussion().isEmpty()) {
-                    // If there are no discussions, we can assume it's waiting on a client response
-                    pendingClientResponse++;
-                    continue;
-                }
-                
-                Note lastEntry = ticket.getDiscussion().get(ticket.getDiscussion().size() - 1);
-                
-                if (lastEntry.getMember() != null ) {
-                    
-                    if (lastEntry.getMember().getName().equalsIgnoreCase(ticket.getContact().getName())){
-                        pendingInternalResponse++;
-                        responseCount++;
-                    }
-                    else {
-                        pendingClientResponse++;
-                        responseCount++;
-                    }
 
-                } else if (lastEntry.getContact() != null) {
-                    
-                    if (lastEntry.getContact().getName().equalsIgnoreCase(ticket.getContact().getName())){
-                        pendingInternalResponse++;
-                        responseCount++;
-                    }
-                    else {
+                if (ticket.getStatus() != null && ticket.getStatus().name != null) {
+                    ticketStatuses.put(ticket.getStatus().name, ticketStatuses.getOrDefault(ticket.getStatus().name, 0) + 1);
+                }
+
+                String contactName = ticket.getContact() != null ? ticket.getContact().getName() : null;
+                if (contactName != null && !contactName.isBlank()) {
+                    ticketContacts.put(contactName, ticketContacts.getOrDefault(contactName, 0) + 1);
+                }
+
+                if (ticket.getDiscussion() != null && !ticket.getDiscussion().isEmpty()) {
+                    Note lastEntry = ticket.getDiscussion().get(ticket.getDiscussion().size() - 1);
+                    if (isInternalEntry(lastEntry, ticket)) {
                         pendingClientResponse++;
-                        responseCount++;
+                    } else {
+                        pendingInternalResponse++;
                     }
-                    
+                    responseCount++;
                 } else {
-                    // If we can't determine who made the last entry, we'll skip response time calculation for this ticket
-                    continue;
+                    pendingInternalResponse++;
                 }
-                
-                
-                // Organize ticket statuses for dashboard display
-                if (ticketStatuses.containsKey(ticket.getStatus().name)) {
-                    ticketStatuses.put(ticket.getStatus().name, ticketStatuses.get(ticket.getStatus().name) + 1);
-                } else {
-                    ticketStatuses.put(ticket.getStatus().name, 1);
-                }
-                
-                // Organize ticket contacts for dashboard display
-                if (ticketContacts.containsKey(ticket.getContact().getName())) {
-                    ticketContacts.put(ticket.getContact().getName(), ticketContacts.get(ticket.getContact().getName()) + 1);
-                } else {
-                    ticketContacts.put(ticket.getContact().getName(), 1);
-                }
-                
-                // Calculate average response time based on time entries
+
                 totalResponseTime += ticket.getActualHours();
-                
             }
-
         } catch (IOException | InterruptedException e) {
-            log.error("Error fetching ticket stats for tenantId={}", tenantId, e);
+            log.error("Error fetching ticket stats for trackedCompanyIds={}", trackedCompanyIds, e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         double avgResponse = responseCount > 0 ? totalResponseTime / responseCount : 0;
@@ -121,5 +87,32 @@ public class TicketStatsService {
         stats.put("ticketContacts", ticketContacts);
         stats.put("ticketBoards", ticketBoards);
         return stats;
+    }
+
+    private boolean isInternalEntry(Note entry, Ticket ticket) {
+        if (entry == null) {
+            return false;
+        }
+
+        if (entry.getMember() != null && entry.getMember().getName() != null && !entry.getMember().getName().isBlank()) {
+            return true;
+        }
+
+        if (entry.isInternalAnalysisFlag() || entry.isResolutionFlag()) {
+            return true;
+        }
+
+        String ticketContactName = ticket.getContact() != null ? ticket.getContact().getName() : null;
+        String entryContactName = entry.getContact() != null ? entry.getContact().getName() : null;
+
+        if (entryContactName == null || entryContactName.isBlank()) {
+            return true;
+        }
+
+        if (ticketContactName == null || ticketContactName.isBlank()) {
+            return false;
+        }
+
+        return !entryContactName.trim().equalsIgnoreCase(ticketContactName.trim());
     }
 }

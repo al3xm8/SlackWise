@@ -150,8 +150,52 @@ public class ConnectwiseService {
             ticket.setNotes(fetchNotesByTicketId(String.valueOf(ticket.getId())));
             ticket.setDiscussion(ticket.getDiscussion());
         }
-
         return tickets;
+    }
+    /**
+     * Fetch open tickets across all tracked company IDs and merge into one list.
+     * Duplicate ticket IDs are removed.
+     *
+     * @param companyIds tracked company IDs/identifiers
+     * @return merged open ticket list
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public List<Ticket> fetchOpenTicketsByCompanyIds(List<String> companyIds) throws IOException, InterruptedException {
+        if (companyIds == null || companyIds.isEmpty()) {
+            return java.util.List.of();
+        }
+
+        java.util.Map<Integer, Ticket> mergedTickets = new java.util.LinkedHashMap<>();
+        IOException firstIoException = null;
+
+        for (String companyIdValue : companyIds) {
+            if (companyIdValue == null || companyIdValue.isBlank()) {
+                continue;
+            }
+
+            String normalizedCompanyId = companyIdValue.trim();
+            try {
+                List<Ticket> companyTickets = fetchOpenTicketsByCompanyId(normalizedCompanyId);
+                for (Ticket ticket : companyTickets) {
+                    mergedTickets.putIfAbsent(ticket.getId(), ticket);
+                }
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw ex;
+            } catch (IOException ex) {
+                if (firstIoException == null) {
+                    firstIoException = ex;
+                }
+                log.error("Failed to fetch open tickets for companyId={}", normalizedCompanyId, ex);
+            }
+        }
+
+        if (mergedTickets.isEmpty() && firstIoException != null) {
+            throw firstIoException;
+        }
+
+        return new java.util.ArrayList<>(mergedTickets.values());
     }
 
     private String buildCompanyFilterCondition(String companyValue) {
@@ -808,3 +852,4 @@ public class ConnectwiseService {
 }
 
 // https://regex101.com/r/eqaa9m/1
+

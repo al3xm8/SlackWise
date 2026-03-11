@@ -63,3 +63,8 @@ dist-ssr
 *.sw?
 
 vite.config.ts*
+
+# Environment files
+.env
+.env.*
+!.env.example

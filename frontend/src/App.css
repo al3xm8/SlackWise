@@ -1,6 +1,9 @@
-/* App Styles */
 main.main-content {
   flex: 1;
-  background-color: var(--bg-page);
+}
+
+main.app-main-content {
+  background: var(--app-atmo-bg);
   padding-top: 1rem;
+  min-height: calc(100vh - 88px);
 }

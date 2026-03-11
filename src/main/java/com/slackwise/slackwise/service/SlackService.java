@@ -58,13 +58,31 @@ public class SlackService {
      */
     public ChatPostMessageResponse postNewTicket(String tenantId, String ticketId, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException {
 
+        if (slackBotToken == null || slackBotToken.isBlank()) {
+            log.error("Cannot post ticketId={} to Slack: bot token is missing for tenantId={}", ticketId, tenantId);
+            return null;
+        }
+        if (slackChannelId == null || slackChannelId.isBlank()) {
+            log.error("Cannot post ticketId={} to Slack: channel ID is missing for tenantId={}", ticketId, tenantId);
+            return null;
+        }
 
         // Attempt to create the ticket item if it doesn't exist yet. This avoids races where multiple
         // processes try to post the top-level Slack message concurrently.
         if (amazonService.createTicketItem(tenantId, ticketId, "") == false) {
-            // Ticket item already exists, so another process has already posted the Slack message.
-            log.info("Ticket item already exists for ticketId={}, skipping Slack post", ticketId);
-            return null;
+            // If a previous attempt failed, the item may exist with an empty ts_thread.
+            // In that case we should retry posting to Slack instead of skipping forever.
+            Map<String, AttributeValue> existingTicket = amazonService.getTicket(tenantId, ticketId);
+            String existingThreadTs = existingTicket != null && existingTicket.containsKey("ts_thread")
+                ? existingTicket.get("ts_thread").s()
+                : null;
+
+            if (existingThreadTs != null && !existingThreadTs.isBlank()) {
+                log.info("Ticket item already has thread_ts for ticketId={}, skipping Slack post", ticketId);
+                return null;
+            }
+
+            log.info("Ticket item exists without thread_ts for ticketId={}, retrying Slack post", ticketId);
         }
 
         // Get the contact name for a new ticket
@@ -90,7 +108,17 @@ public class SlackService {
                     .mrkdwn(true)
             );
 
+            if (response == null || !response.isOk()) {
+                String slackError = response != null ? response.getError() : "unknown_error";
+                log.error("Failed posting new ticket to Slack for ticketId={} tenantId={} error={}", ticketId, tenantId, slackError);
+                return null;
+            }
+
             String postedTs = response.getTs();
+            if (postedTs == null || postedTs.isBlank()) {
+                log.error("Slack post for ticketId={} tenantId={} succeeded without ts; skipping thread_ts update", ticketId, tenantId);
+                return null;
+            }
 
             // Attempt to set the thread_ts in DynamoDB. If this fails, it means another process
             // has already set it, so we delete the duplicate Slack message we just posted.
@@ -130,31 +158,45 @@ public class SlackService {
      */
     public List<ChatPostMessageResponse> updateTicketThread(String tenantId, String ticketId, List<Note> discussion, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException, SlackApiException {
 
+        if (slackBotToken == null || slackBotToken.isBlank()) {
+            log.error("Cannot update thread for ticketId={} because Slack bot token is missing for tenantId={}", ticketId, tenantId);
+            return null;
+        }
+        if (slackChannelId == null || slackChannelId.isBlank()) {
+            log.error("Cannot update thread for ticketId={} because Slack channel ID is missing for tenantId={}", ticketId, tenantId);
+            return null;
+        }
+        if (discussion == null || discussion.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         // Implement logic to update the Slack thread for the ticket
         // This could involve searching for the original message and posting a reply
-        List<ChatPostMessageResponse> responses = new java.util.ArrayList<>();
+        List<ChatPostMessageResponse> responses = new ArrayList<>();
 
         // Fetch thread_ts and posted notes from DynamoDB
         Map<String, AttributeValue> ticket = amazonService.getTicket(tenantId, ticketId);
 
         // If Dynamo lookup fails, log and continue to attempt posting (fail open)
-        String tsThread = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
+        String resolvedThreadTs = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
 
         // If we don't have a thread_ts, post a new top-level message first
         // This can happen if the initial ticket creation event failed to post to Slack
         // or if we missed that event entirely.
         // If posting the new ticket fails, abort the note posting. Don't want to spam Slack.
-        if (tsThread == null) {
+        if (resolvedThreadTs == null || resolvedThreadTs.isBlank()) {
             log.warn("No thread_ts found for ticketId={}, posting top-level message", ticketId);
             postNewTicket(tenantId, ticketId, summary, slackChannelId, slackBotToken);
             ticket = amazonService.getTicket(tenantId, ticketId);
 
             String tsThread2 = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;
-            if (tsThread2 == null) {
+            if (tsThread2 == null || tsThread2.isBlank()) {
                 log.error("Failed to retrieve thread_ts after posting ticketId={}, aborting note posting", ticketId);
                 return null;
             }
+            resolvedThreadTs = tsThread2;
         }
+        final String threadTsToUse = resolvedThreadTs;
 
         
         // Keep track of already posted note IDs to avoid duplicates
@@ -188,7 +230,7 @@ public class SlackService {
                     ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
                             .channel(slackChannelId)
                             .text("🆔 " + note.getId() + "   👤 " + contactName + "\n\n" + slackNoteText)
-                            .threadTs(tsThread)
+                            .threadTs(threadTsToUse)
                             .mrkdwn(true)
                     );
 

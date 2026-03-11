@@ -1,5 +1,7 @@
 package com.slackwise.slackwise.model;
 
+import java.util.List;
+
 public class RoutingRule {
     private String ruleId;
     private String tenantId;
@@ -17,6 +19,37 @@ public class RoutingRule {
     private String secondaryOperator;
     private String secondaryValue;
     private String joinOperator;
+    private List<RuleCondition> conditions;
+
+    public static class RuleCondition {
+        private String field;
+        private String operator;
+        private String value;
+
+        public String getField() {
+            return field;
+        }
+
+        public void setField(String field) {
+            this.field = field;
+        }
+
+        public String getOperator() {
+            return operator;
+        }
+
+        public void setOperator(String operator) {
+            this.operator = operator;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
 
     public String getRuleId() {
         return ruleId;
@@ -144,5 +177,13 @@ public class RoutingRule {
 
     public void setJoinOperator(String joinOperator) {
         this.joinOperator = joinOperator;
+    }
+
+    public List<RuleCondition> getConditions() {
+        return conditions;
+    }
+
+    public void setConditions(List<RuleCondition> conditions) {
+        this.conditions = conditions;
     }
 }

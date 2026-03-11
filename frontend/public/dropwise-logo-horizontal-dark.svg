@@ -1,4 +1,4 @@
-<!-- Dropwise Logo - Full Horizontal (Light Background) -->
+<!-- Dropwise Logo - Horizontal (Dark Background) -->
 <svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="dropGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -37,6 +37,6 @@
     letter-spacing="-1"
   >
     <tspan fill="url(#textGradient)">drop</tspan>
-    <tspan dx="6" fill="#0f2742">wise</tspan>
+    <tspan dx="4" fill="#f3f8ff">wise</tspan>
   </text>
 </svg>

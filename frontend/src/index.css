@@ -29,6 +29,36 @@
   --danger-bg: #fff3f3;
   --danger-border: #f5c7ca;
   --navbar-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+  --app-atmo-bg: radial-gradient(circle at 10% 12%, #ffe7bf 0%, transparent 36%),
+    radial-gradient(circle at 92% 14%, #d3ecff 0%, transparent 30%),
+    linear-gradient(160deg, #f7f6ef 0%, #eef5ff 100%);
+  --brand-heading: #0f2742;
+  --brand-body: #36506b;
+  --brand-muted: #53718f;
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-bg-strong: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(171, 198, 226, 0.6);
+  --glass-shadow: 0 16px 34px rgba(15, 39, 66, 0.08);
+  --panel-soft-bg: #f8fbff;
+  --panel-soft-border: #cfe2f4;
+  --row-hover-bg: #edf5ff;
+  --row-active-bg: #dcebfb;
+  --brand-input-bg: #fafdff;
+  --brand-input-border: #bed7ef;
+  --brand-input-text: #102f4c;
+  --brand-secondary-bg: #f1f7ff;
+  --brand-secondary-text: #0f4f93;
+  --brand-secondary-border: #b8d6f4;
+  --brand-primary-gradient: linear-gradient(120deg, #1776e1 0%, #0f5cbc 100%);
+  --brand-primary-gradient-hover: linear-gradient(120deg, #1368cb 0%, #0b509f 100%);
+  --brand-primary-shadow: 0 8px 20px rgba(15, 92, 188, 0.25);
+  --app-navbar-bg: rgba(255, 255, 255, 0.7);
+  --app-navbar-border: rgba(171, 198, 226, 0.72);
+  --app-navbar-shadow: 0 12px 30px rgba(15, 39, 66, 0.12);
+  --app-navbar-link: #1c3f62;
+  --app-navbar-link-hover-bg: rgba(255, 255, 255, 0.4);
+  --app-navbar-link-active-bg: rgba(23, 118, 225, 0.16);
 }
 
 :root[data-theme='dark'] {
@@ -56,6 +86,36 @@
   --danger-bg: #3b1f26;
   --danger-border: #6b313a;
   --navbar-gradient: linear-gradient(135deg, #203157 0%, #2c1d4a 100%);
+
+  --app-atmo-bg: radial-gradient(circle at 8% 12%, rgba(22, 35, 61, 0.95) 0%, transparent 36%),
+    radial-gradient(circle at 92% 12%, rgba(26, 52, 85, 0.85) 0%, transparent 32%),
+    linear-gradient(160deg, #0f1420 0%, #121b2b 100%);
+  --brand-heading: #e9f2ff;
+  --brand-body: #b7c8e3;
+  --brand-muted: #8fa4c5;
+  --glass-bg: rgba(20, 30, 47, 0.78);
+  --glass-bg-strong: rgba(20, 30, 47, 0.9);
+  --glass-border: rgba(66, 92, 130, 0.6);
+  --glass-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+  --panel-soft-bg: #172233;
+  --panel-soft-border: #2d415f;
+  --row-hover-bg: #1e2b40;
+  --row-active-bg: #243753;
+  --brand-input-bg: #152033;
+  --brand-input-border: #3a5275;
+  --brand-input-text: #e2edff;
+  --brand-secondary-bg: #20324b;
+  --brand-secondary-text: #d7e7ff;
+  --brand-secondary-border: #3b5579;
+  --brand-primary-gradient: linear-gradient(120deg, #4f8fe8 0%, #2f6fc6 100%);
+  --brand-primary-gradient-hover: linear-gradient(120deg, #4483da 0%, #285ea9 100%);
+  --brand-primary-shadow: 0 8px 20px rgba(20, 51, 93, 0.4);
+  --app-navbar-bg: rgba(15, 23, 36, 0.74);
+  --app-navbar-border: rgba(64, 88, 122, 0.8);
+  --app-navbar-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+  --app-navbar-link: #d6e6ff;
+  --app-navbar-link-hover-bg: rgba(73, 112, 161, 0.28);
+  --app-navbar-link-active-bg: rgba(79, 143, 232, 0.28);
 }
 
 body {
@@ -291,3 +351,4 @@ main.main-content {
     opacity: 0;
   }
 }
+

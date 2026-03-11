@@ -129,3 +129,28 @@ Webhooks/events 🔔:
 - `GET /api/slack/oauth/callback`
 - `POST /api/connectwise/events`
 - `POST /api/slack/events`
+
+## Auth (OIDC + JWT) 🔐
+
+Backend API auth is controlled with:
+- `APP_AUTH_ENABLED` (`false` for local fallback, `true` for production)
+- `OAUTH_ISSUER_URI` (JWT issuer URI)
+- `OAUTH_AUDIENCE` (API audience)
+- `APP_AUTH_TENANT_CLAIMS` (comma-separated claim names checked for tenant id, e.g. `tenant_id,tenantId,company_id,org_id`)
+
+When enabled:
+- `/api/tenants/**` and `/api/tickets/**` require a bearer token.
+- Tenant access is enforced from JWT claims.
+
+Frontend OIDC config (`frontend/.env.example`):
+- `VITE_OIDC_ISSUER`
+- `VITE_OIDC_CLIENT_ID`
+- `VITE_OIDC_AUDIENCE`
+- `VITE_OIDC_SCOPE`
+- `VITE_OIDC_REDIRECT_PATH` (default `/auth/callback`)
+- `VITE_OIDC_TENANT_CLAIMS`
+
+UI auth flow:
+- Sign in/up page can start hosted OIDC login.
+- Callback route is `/auth/callback`.
+- Access token is attached automatically to API requests from the frontend session.

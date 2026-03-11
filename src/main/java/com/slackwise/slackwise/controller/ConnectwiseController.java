@@ -148,6 +148,8 @@ public class ConnectwiseController {
             Set<String> trackedCompanyIds = resolveTrackedCompanyIds(tenantConfig);
             int autoAssignmentDelayMinutes = resolveAutoAssignmentDelayMinutes(tenantConfig);
             Set<String> assignmentExclusionKeywords = resolveAssignmentExclusionKeywords(tenantConfig);
+            String effectiveSlackBotToken = resolveSlackBotToken(tenantConfig);
+            String effectiveDefaultChannelId = resolveDefaultSlackChannelId(tenantConfig);
 
             /*
                 Get ticket ID from payload
@@ -211,8 +213,13 @@ public class ConnectwiseController {
                     // Only process if action is "added" or "updated"
                     if (payload.get("Action").equals("added") || payload.get("Action").equals("updated")){
 
+                        if (effectiveSlackBotToken == null || effectiveSlackBotToken.isBlank()) {
+                            log.error("No Slack bot token configured for tenantId={}; skipping Slack sync for ticketId={}", tenantId, ticketId);
+                            return ResponseEntity.ok("Missing Slack bot token configuration");
+                        }
+
                         RoutingRule matchedRule = routingService.resolveRule(tenantId, ticket);
-                        String resolvedChannelId = slackChannelId;
+                        String resolvedChannelId = effectiveDefaultChannelId;
                         if (matchedRule != null
                             && matchedRule.getTargetChannelId() != null
                             && !matchedRule.getTargetChannelId().isBlank()) {
@@ -220,10 +227,10 @@ public class ConnectwiseController {
                         }
 
                         log.info("Posting new Slack message for ticketId={} summary={}", ticketId, ticket.getSummary());
-                        slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, slackBotToken);
+                        slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, effectiveSlackBotToken);
 
                         log.info("Updating Slack thread for ticketId={}", ticketId);
-                        slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId, slackBotToken);
+                        slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId, effectiveSlackBotToken);
                         
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
                         final int finalTicketId = ticketId;
@@ -357,6 +364,20 @@ public class ConnectwiseController {
             }
         }
         return values;
+    }
+
+    private String resolveSlackBotToken(TenantConfig config) {
+        if (config != null && config.getSlackBotToken() != null && !config.getSlackBotToken().isBlank()) {
+            return config.getSlackBotToken().trim();
+        }
+        return slackBotToken != null ? slackBotToken.trim() : "";
+    }
+
+    private String resolveDefaultSlackChannelId(TenantConfig config) {
+        if (config != null && config.getDefaultChannelId() != null && !config.getDefaultChannelId().isBlank()) {
+            return config.getDefaultChannelId().trim();
+        }
+        return slackChannelId != null ? slackChannelId.trim() : "";
     }
 
     private boolean shouldSkipAutoAssignment(Ticket ticket, Set<String> exclusionKeywords) {

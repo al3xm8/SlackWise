@@ -1,6 +1,7 @@
 package com.slackwise.slackwise.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -56,33 +57,33 @@ public class RoutingService {
     }
 
     private static boolean hasSentenceCondition(RoutingRule rule) {
+        if (rule.getConditions() != null && !rule.getConditions().isEmpty()) {
+            return rule.getConditions().stream().anyMatch(condition ->
+                isPresent(condition.getField()) && isPresent(condition.getOperator()) && isPresent(condition.getValue())
+            );
+        }
         return isPresent(rule.getPrimaryField()) && isPresent(rule.getPrimaryOperator()) && isPresent(rule.getPrimaryValue());
     }
 
     private static boolean matchesSentenceRule(RoutingRule rule, Ticket ticket) {
-        boolean primary = evaluateCondition(
-            rule.getPrimaryField(),
-            rule.getPrimaryOperator(),
-            rule.getPrimaryValue(),
-            ticket
-        );
-
-        if (!isPresent(rule.getSecondaryField()) || !isPresent(rule.getSecondaryOperator()) || !isPresent(rule.getSecondaryValue())) {
-            return primary;
+        List<RoutingRule.RuleCondition> conditions = extractConditions(rule);
+        if (conditions.isEmpty()) {
+            return false;
         }
-
-        boolean secondary = evaluateCondition(
-            rule.getSecondaryField(),
-            rule.getSecondaryOperator(),
-            rule.getSecondaryValue(),
-            ticket
-        );
 
         String joinOperator = normalize(rule.getJoinOperator());
-        if ("OR".equals(joinOperator)) {
-            return primary || secondary;
+        if (conditions.size() == 1) {
+            RoutingRule.RuleCondition onlyCondition = conditions.get(0);
+            return evaluateCondition(onlyCondition.getField(), onlyCondition.getOperator(), onlyCondition.getValue(), ticket);
         }
-        return primary && secondary;
+
+        if ("OR".equals(joinOperator)) {
+            return conditions.stream()
+                .anyMatch(condition -> evaluateCondition(condition.getField(), condition.getOperator(), condition.getValue(), ticket));
+        }
+
+        return conditions.stream()
+            .allMatch(condition -> evaluateCondition(condition.getField(), condition.getOperator(), condition.getValue(), ticket));
     }
 
     private static boolean evaluateCondition(String field, String operator, String expected, Ticket ticket) {
@@ -95,6 +96,11 @@ public class RoutingService {
 
         if ("EQUALS".equals(normalizedOperator)) {
             return actual.equalsIgnoreCase(expectedValue);
+        }
+        if ("NOT_EQUALS".equals(normalizedOperator)
+            || "DOES_NOT_EQUAL".equals(normalizedOperator)
+            || "DOES_NOT_EQUALS".equals(normalizedOperator)) {
+            return !actual.equalsIgnoreCase(expectedValue);
         }
         if ("CONTAINS".equals(normalizedOperator)) {
             return containsIgnoreCase(actual, expectedValue);
@@ -162,6 +168,37 @@ public class RoutingService {
 
     private static boolean isPresent(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static List<RoutingRule.RuleCondition> extractConditions(RoutingRule rule) {
+        if (rule.getConditions() != null && !rule.getConditions().isEmpty()) {
+            return rule.getConditions().stream()
+                .filter(condition -> condition != null
+                    && isPresent(condition.getField())
+                    && isPresent(condition.getOperator())
+                    && isPresent(condition.getValue()))
+                .collect(Collectors.toList());
+        }
+
+        java.util.ArrayList<RoutingRule.RuleCondition> conditions = new java.util.ArrayList<>();
+
+        if (isPresent(rule.getPrimaryField()) && isPresent(rule.getPrimaryOperator()) && isPresent(rule.getPrimaryValue())) {
+            RoutingRule.RuleCondition primary = new RoutingRule.RuleCondition();
+            primary.setField(rule.getPrimaryField());
+            primary.setOperator(rule.getPrimaryOperator());
+            primary.setValue(rule.getPrimaryValue());
+            conditions.add(primary);
+        }
+
+        if (isPresent(rule.getSecondaryField()) && isPresent(rule.getSecondaryOperator()) && isPresent(rule.getSecondaryValue())) {
+            RoutingRule.RuleCondition secondary = new RoutingRule.RuleCondition();
+            secondary.setField(rule.getSecondaryField());
+            secondary.setOperator(rule.getSecondaryOperator());
+            secondary.setValue(rule.getSecondaryValue());
+            conditions.add(secondary);
+        }
+
+        return conditions;
     }
 
     private static String normalize(String value) {

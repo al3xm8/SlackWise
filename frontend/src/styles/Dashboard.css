@@ -244,3 +244,242 @@
     font-size: 2rem;
   }
 }
+
+/* Marketing Theme Overrides */
+.dashboard-container {
+  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Segoe UI', sans-serif;
+  color: #0f2742;
+}
+
+.dashboard-container h1 {
+  color: #0f2742;
+  font-weight: 700;
+}
+
+.stat-card,
+.dashboard-section {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(171, 198, 226, 0.6);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(15, 39, 66, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.stat-card {
+  border-left: 0;
+}
+
+.stat-content h3,
+.bar-label,
+.empty-breakdown {
+  color: #36506b;
+}
+
+.stat-value,
+.bar-value {
+  color: #0f5cbc;
+}
+
+.breakdown-nav-btn {
+  background: #f1f7ff;
+  color: #0f5cbc;
+  border: 1px solid #b8d6f4;
+}
+
+.breakdown-nav-btn:hover {
+  background: #dcebfb;
+}
+
+.bar-track {
+  background: #e9f3fe;
+}
+
+.bar-fill {
+  background: linear-gradient(120deg, #1776e1 0%, #0f5cbc 100%);
+}
+
+.breakdown-indicator {
+  background: #bed4eb;
+}
+
+.breakdown-indicator.active {
+  background: #1776e1;
+}
+
+/* Theme Token Overrides */
+.dashboard-container {
+  color: var(--brand-body);
+}
+
+.dashboard-container h1 {
+  color: var(--brand-heading);
+}
+
+.stat-card,
+.dashboard-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.stat-content h3,
+.bar-label,
+.empty-breakdown {
+  color: var(--brand-body);
+}
+
+.stat-value,
+.bar-value {
+  color: var(--accent-text);
+}
+
+.breakdown-nav-btn {
+  background: var(--brand-secondary-bg);
+  color: var(--brand-secondary-text);
+  border: 1px solid var(--brand-secondary-border);
+}
+
+.breakdown-nav-btn:hover {
+  background: var(--row-hover-bg);
+}
+
+.breakdown-indicator {
+  background: var(--brand-secondary-border);
+}
+
+.breakdown-indicator.active {
+  background: var(--accent);
+}
+
+.bar-track {
+  background: var(--panel-soft-bg);
+}
+
+.bar-fill {
+  background: var(--brand-primary-gradient);
+}
+
+.dashboard-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.company-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--brand-body);
+  font-weight: 600;
+}
+
+.company-filter select {
+  min-width: 240px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+}
+
+.toolbar-meta {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.stat-card-button {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-card-button.active {
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--glass-shadow);
+}
+
+.stat-subtext {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.drilldown-panel {
+  margin-bottom: 1.25rem;
+}
+
+.drilldown-description {
+  margin: 0.5rem 0 1rem;
+  color: var(--text-secondary);
+}
+
+.heavy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.heavy-grid h3 {
+  margin: 0 0 0.6rem;
+  color: var(--brand-heading);
+  font-size: 1rem;
+}
+
+.heavy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.heavy-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--panel-soft-bg);
+  padding: 0.7rem 0.8rem;
+}
+
+.heavy-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heavy-meta {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .heavy-grid,
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-toolbar {
+    align-items: stretch;
+  }
+
+  .company-filter select {
+    min-width: 0;
+    width: 100%;
+  }
+}

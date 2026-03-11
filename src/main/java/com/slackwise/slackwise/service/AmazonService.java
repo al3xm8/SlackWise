@@ -1,6 +1,8 @@
 package com.slackwise.slackwise.service;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,7 +35,7 @@ public class AmazonService {
     private static final String SK_CONFIG = "CONFIG";
     private static final String SK_PREFIX_RULE = "RULE#";
     private static final String SK_PREFIX_TICKET = "TICKET#";
-
+    private static final String SK_PREFIX_WEBHOOK_EVENT = "WEBHOOK_EVENT#";
     // AWS configuration properties
     @Value("${aws.region}")
     private String awsRegion;
@@ -66,6 +68,10 @@ public class AmazonService {
 
     private static String ruleSk(int priority, String ruleId) {
         return String.format("RULE#%04d#%s", priority, ruleId);
+    }
+
+    private static String webhookEventSk(String eventId) {
+        return SK_PREFIX_WEBHOOK_EVENT + eventId;
     }
 
     // Initialize DynamoDB client
@@ -101,6 +107,7 @@ public class AmazonService {
         // Validate input
         if (ticketId == null || ticketId.isBlank()) throw new IllegalArgumentException("ticketId is null/blank");
         String ticketIdStr = String.valueOf(ticketId);
+        String safeThreadTs = tsThread != null ? tsThread : "";
         
         // Prepare Map to put ticketId and thread ts and link them together
         Map<String, AttributeValue> item = new java.util.HashMap<>();
@@ -108,7 +115,7 @@ public class AmazonService {
         item.put("sk", AttributeValue.builder().s(ticketSk(ticketIdStr)).build());
         item.put("itemType", AttributeValue.builder().s("TICKET").build());
         item.put("ticketId", AttributeValue.builder().s(ticketIdStr).build());
-        item.put("ts_thread", AttributeValue.builder().s(tsThread).build());
+        item.put("ts_thread", AttributeValue.builder().s(safeThreadTs).build());
 
         // Always include notes in Map, even if empty
         item.put("notes", AttributeValue.builder().l(
@@ -213,6 +220,7 @@ public class AmazonService {
      * @return true if created, false if item exists
      */
     public boolean createTicketItem(String tenantId, String ticketId, String tsThread) {
+        String safeThreadTs = tsThread != null ? tsThread : "";
         
         // Prepare Map item to put into DynamoDB
         try {
@@ -221,7 +229,7 @@ public class AmazonService {
             item.put("sk", AttributeValue.builder().s(ticketSk(String.valueOf(ticketId))).build());
             item.put("itemType", AttributeValue.builder().s("TICKET").build());
             item.put("ticketId", AttributeValue.builder().s(String.valueOf(ticketId)).build());
-            item.put("ts_thread", AttributeValue.builder().s(tsThread).build());
+            item.put("ts_thread", AttributeValue.builder().s(safeThreadTs).build());
             item.put("notes", AttributeValue.builder().l(java.util.List.of()).build());
 
             // Put item with condition that sk must not already exist
@@ -248,6 +256,14 @@ public class AmazonService {
      * @return true if updated, false if another value already present
      */
     public boolean setThreadTs(String tenantId, String ticketId, String tsThread) {
+        if (tenantId == null || tenantId.isBlank() || ticketId == null || ticketId.isBlank()) {
+            log.warn("setThreadTs skipped because tenantId or ticketId is blank. tenantId={}, ticketId={}", tenantId, ticketId);
+            return false;
+        }
+        if (tsThread == null || tsThread.isBlank()) {
+            log.warn("setThreadTs skipped for tenantId={} ticketId={} because tsThread is blank", tenantId, ticketId);
+            return false;
+        }
         try {
 
             // update with condition that ts_thread is missing or empty
@@ -269,9 +285,46 @@ public class AmazonService {
          // If condition fails (ts_thread already set), return false
         } catch (ConditionalCheckFailedException e) {
             return false;
+        } catch (DynamoDbException e) {
+            log.error("Failed to set thread_ts for tenantId={} ticketId={}", tenantId, ticketId, e);
+            return false;
         }
     }
+    /**
+     * Track a Slack event ID to enforce idempotent webhook processing.
+     *
+     * @param tenantId Tenant identifier
+     * @param eventId Slack event_id
+     * @param ttlSeconds seconds from now for TTL cleanup
+     * @return true if this event is new, false if already processed
+     */
+    public boolean registerSlackEventIfNew(String tenantId, String eventId, long ttlSeconds) {
+        if (tenantId == null || tenantId.isBlank() || eventId == null || eventId.isBlank()) {
+            return false;
+        }
 
+        long expiresAtEpoch = Instant.now().getEpochSecond() + Math.max(ttlSeconds, 300L);
+        Map<String, AttributeValue> item = new java.util.HashMap<>();
+        item.put("tenantId", AttributeValue.builder().s(tenantId).build());
+        item.put("sk", AttributeValue.builder().s(webhookEventSk(eventId)).build());
+        item.put("itemType", AttributeValue.builder().s("WEBHOOK_EVENT").build());
+        item.put("eventId", AttributeValue.builder().s(eventId).build());
+        item.put("expiresAtEpoch", AttributeValue.builder().n(String.valueOf(expiresAtEpoch)).build());
+
+        try {
+            dynamoDb.putItem(PutItemRequest.builder()
+                .tableName(tableName)
+                .item(item)
+                .conditionExpression("attribute_not_exists(sk)")
+                .build());
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            return false;
+        } catch (DynamoDbException e) {
+            log.error("Failed to register webhook event_id={} for tenantId={}", eventId, tenantId, e);
+            return true;
+        }
+    }
     /**
      * Get ticketId by looking up the item with matching ts_thread. Returns null if ticketId is not found or tenant is not set.
      * 
@@ -419,6 +472,31 @@ public class AmazonService {
         if (rule.getSecondaryOperator() != null) item.put("secondaryOperator", AttributeValue.builder().s(rule.getSecondaryOperator()).build());
         if (rule.getSecondaryValue() != null) item.put("secondaryValue", AttributeValue.builder().s(rule.getSecondaryValue()).build());
         if (rule.getJoinOperator() != null) item.put("joinOperator", AttributeValue.builder().s(rule.getJoinOperator()).build());
+        if (rule.getConditions() != null && !rule.getConditions().isEmpty()) {
+            List<AttributeValue> conditionValues = rule.getConditions().stream()
+                .map(this::toConditionAttribute)
+                .filter(conditionAttribute -> conditionAttribute != null)
+                .toList();
+            if (!conditionValues.isEmpty()) {
+                item.put("conditions", AttributeValue.builder().l(conditionValues).build());
+            }
+            // Backward compatibility for any clients still reading primary/secondary fields.
+            if (!item.containsKey("primaryField") && !item.containsKey("primaryOperator") && !item.containsKey("primaryValue")) {
+                RoutingRule.RuleCondition first = rule.getConditions().get(0);
+                if (first.getField() != null) item.put("primaryField", AttributeValue.builder().s(first.getField()).build());
+                if (first.getOperator() != null) item.put("primaryOperator", AttributeValue.builder().s(first.getOperator()).build());
+                if (first.getValue() != null) item.put("primaryValue", AttributeValue.builder().s(first.getValue()).build());
+            }
+            if (rule.getConditions().size() > 1
+                && !item.containsKey("secondaryField")
+                && !item.containsKey("secondaryOperator")
+                && !item.containsKey("secondaryValue")) {
+                RoutingRule.RuleCondition second = rule.getConditions().get(1);
+                if (second.getField() != null) item.put("secondaryField", AttributeValue.builder().s(second.getField()).build());
+                if (second.getOperator() != null) item.put("secondaryOperator", AttributeValue.builder().s(second.getOperator()).build());
+                if (second.getValue() != null) item.put("secondaryValue", AttributeValue.builder().s(second.getValue()).build());
+            }
+        }
 
         dynamoDb.putItem(PutItemRequest.builder()
             .tableName(tableName)
@@ -458,6 +536,21 @@ public class AmazonService {
             if (item.containsKey("secondaryOperator")) rule.setSecondaryOperator(item.get("secondaryOperator").s());
             if (item.containsKey("secondaryValue")) rule.setSecondaryValue(item.get("secondaryValue").s());
             if (item.containsKey("joinOperator")) rule.setJoinOperator(item.get("joinOperator").s());
+            if (item.containsKey("conditions")) {
+                List<RoutingRule.RuleCondition> conditions = item.get("conditions").l().stream()
+                    .map(this::fromConditionAttribute)
+                    .filter(condition -> condition != null)
+                    .toList();
+                if (!conditions.isEmpty()) {
+                    rule.setConditions(conditions);
+                }
+            }
+            if (rule.getConditions() == null || rule.getConditions().isEmpty()) {
+                List<RoutingRule.RuleCondition> legacyConditions = buildConditionsFromLegacy(rule);
+                if (!legacyConditions.isEmpty()) {
+                    rule.setConditions(legacyConditions);
+                }
+            }
             rules.add(rule);
         }
         return rules;
@@ -474,4 +567,69 @@ public class AmazonService {
             .build());
     }
 
+    private AttributeValue toConditionAttribute(RoutingRule.RuleCondition condition) {
+        if (condition == null) {
+            return null;
+        }
+        Map<String, AttributeValue> conditionMap = new java.util.HashMap<>();
+        if (condition.getField() != null) {
+            conditionMap.put("field", AttributeValue.builder().s(condition.getField()).build());
+        }
+        if (condition.getOperator() != null) {
+            conditionMap.put("operator", AttributeValue.builder().s(condition.getOperator()).build());
+        }
+        if (condition.getValue() != null) {
+            conditionMap.put("value", AttributeValue.builder().s(condition.getValue()).build());
+        }
+        if (conditionMap.isEmpty()) {
+            return null;
+        }
+        return AttributeValue.builder().m(conditionMap).build();
+    }
+
+    private RoutingRule.RuleCondition fromConditionAttribute(AttributeValue attributeValue) {
+        if (attributeValue == null || attributeValue.m() == null || attributeValue.m().isEmpty()) {
+            return null;
+        }
+        Map<String, AttributeValue> conditionMap = attributeValue.m();
+        RoutingRule.RuleCondition condition = new RoutingRule.RuleCondition();
+        if (conditionMap.containsKey("field")) {
+            condition.setField(conditionMap.get("field").s());
+        }
+        if (conditionMap.containsKey("operator")) {
+            condition.setOperator(conditionMap.get("operator").s());
+        }
+        if (conditionMap.containsKey("value")) {
+            condition.setValue(conditionMap.get("value").s());
+        }
+        if (!isPresent(condition.getField()) || !isPresent(condition.getOperator()) || !isPresent(condition.getValue())) {
+            return null;
+        }
+        return condition;
+    }
+
+    private List<RoutingRule.RuleCondition> buildConditionsFromLegacy(RoutingRule rule) {
+        List<RoutingRule.RuleCondition> conditions = new ArrayList<>();
+        if (isPresent(rule.getPrimaryField()) && isPresent(rule.getPrimaryOperator()) && isPresent(rule.getPrimaryValue())) {
+            RoutingRule.RuleCondition primary = new RoutingRule.RuleCondition();
+            primary.setField(rule.getPrimaryField());
+            primary.setOperator(rule.getPrimaryOperator());
+            primary.setValue(rule.getPrimaryValue());
+            conditions.add(primary);
+        }
+        if (isPresent(rule.getSecondaryField()) && isPresent(rule.getSecondaryOperator()) && isPresent(rule.getSecondaryValue())) {
+            RoutingRule.RuleCondition secondary = new RoutingRule.RuleCondition();
+            secondary.setField(rule.getSecondaryField());
+            secondary.setOperator(rule.getSecondaryOperator());
+            secondary.setValue(rule.getSecondaryValue());
+            conditions.add(secondary);
+        }
+        return conditions;
+    }
+
+    private boolean isPresent(String value) {
+        return value != null && !value.isBlank();
+    }
+
 }
+

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import '../styles/CatchUp.css'
 import { uiDebug, uiError, uiWarn } from '../utils/uiDebug'
 import CenteredLoadingBar from './CenteredLoadingBar'
+import { apiFetch } from '../utils/apiClient'
 
 interface TicketResponse {
   id: number
@@ -227,7 +228,7 @@ export default function CatchUp() {
       }
       setLoadError(null)
 
-      const response = await fetch('/api/tickets/open')
+      const response = await apiFetch('/api/tickets/open')
       if (!response.ok) {
         throw new Error('Failed to fetch open tickets')
       }
@@ -397,7 +398,7 @@ export default function CatchUp() {
         resolutionFlag: responseResolution,
       })
 
-      const response = await fetch(`/api/tickets/${selectedTicket.id}/responses`, {
+      const response = await apiFetch(`/api/tickets/${selectedTicket.id}/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -447,7 +448,7 @@ export default function CatchUp() {
         toStatus: statusSelection.trim(),
       })
 
-      const response = await fetch(`/api/tickets/${selectedTicket.id}/status`, {
+      const response = await apiFetch(`/api/tickets/${selectedTicket.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: statusSelection.trim() }),
@@ -837,3 +838,4 @@ export default function CatchUp() {
     </div>
   )
 }
+

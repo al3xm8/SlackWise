@@ -3,8 +3,6 @@ package com.slackwise.slackwise.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,13 +13,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.slackwise.slackwise.model.RoutingRule;
 import com.slackwise.slackwise.model.TenantConfig;
+import com.slackwise.slackwise.security.TenantAccessService;
 import com.slackwise.slackwise.service.AmazonService;
-
-
 
 @RestController
 @RequestMapping("/api/tenants")
@@ -30,12 +26,13 @@ public class TenantAdminController {
     @Autowired
     private AmazonService amazonService;
 
-    @Value("${company.id}")
-    private String defaultTenantId;
+    @Autowired
+    private TenantAccessService tenantAccessService;
 
     @GetMapping("/default")
     public ResponseEntity<java.util.Map<String, String>> getDefaultTenant() {
-        return ResponseEntity.ok(java.util.Map.of("tenantId", defaultTenantId != null ? defaultTenantId : ""));
+        String tenantId = tenantAccessService.requiredTenantId();
+        return ResponseEntity.ok(java.util.Map.of("tenantId", tenantId));
     }
 
     @GetMapping("/{tenantId}")
@@ -93,12 +90,6 @@ public class TenantAdminController {
     }
 
     private void validateTenantAccess(String tenantId) {
-        if (defaultTenantId == null || defaultTenantId.isBlank()) {
-            return;
-        }
-
-        if (!defaultTenantId.equals(tenantId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant access denied");
-        }
+        tenantAccessService.validateTenantAccess(tenantId);
     }
 }

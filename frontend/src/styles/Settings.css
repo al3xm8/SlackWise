@@ -238,3 +238,136 @@
     width: 100%;
   }
 }
+
+/* Marketing Theme Overrides */
+.settings-container {
+  font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Segoe UI', sans-serif;
+  color: #0f2742;
+}
+
+.settings-container h1 {
+  color: #0f2742;
+  font-weight: 700;
+}
+
+.settings-container > p,
+.tenant-state,
+.settings-hint,
+.field-group small {
+  color: #36506b;
+}
+
+.settings-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(171, 198, 226, 0.6);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(15, 39, 66, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.settings-section {
+  border: 1px solid #cfe2f4;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.settings-section h2 {
+  color: #0f5cbc;
+}
+
+.field-group span,
+.tenant-label {
+  color: #1d3d5d;
+}
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+  border: 1px solid #bed7ef;
+  background: #fafdff;
+  color: #102f4c;
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  border-color: #1b72d8;
+  box-shadow: 0 0 0 2px rgba(27, 114, 216, 0.15);
+}
+
+.settings-btn {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.settings-btn-primary {
+  background: linear-gradient(120deg, #1776e1 0%, #0f5cbc 100%);
+  box-shadow: 0 8px 20px rgba(15, 92, 188, 0.22);
+}
+
+.settings-btn-secondary {
+  background: #f1f7ff;
+  color: #0f4f93;
+  border: 1px solid #b8d6f4;
+}
+
+/* Theme Token Overrides */
+.settings-container {
+  color: var(--brand-body);
+}
+
+.settings-container h1,
+.settings-section h2,
+.field-group span,
+.tenant-label {
+  color: var(--brand-heading);
+}
+
+.settings-container > p,
+.tenant-state,
+.settings-hint,
+.field-group small {
+  color: var(--brand-body);
+}
+
+.settings-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.settings-section {
+  border: 1px solid var(--panel-soft-border);
+  background: var(--panel-soft-bg);
+}
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+  border: 1px solid var(--brand-input-border);
+  background: var(--brand-input-bg);
+  color: var(--brand-input-text);
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(23, 118, 225, 0.2);
+}
+
+.settings-btn {
+  border-radius: 999px;
+}
+
+.settings-btn-primary {
+  background: var(--brand-primary-gradient);
+  box-shadow: var(--brand-primary-shadow);
+}
+
+.settings-btn-secondary {
+  background: var(--brand-secondary-bg);
+  color: var(--brand-secondary-text);
+  border: 1px solid var(--brand-secondary-border);
+}
+

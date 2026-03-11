@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import '../styles/Settings.css'
 import { applyThemeMode, normalizeThemeMode, storeThemeMode, type ThemeMode } from '../utils/theme'
+import { apiFetch } from '../utils/apiClient'
 
 interface TenantConfigDto {
   tenantId?: string
@@ -111,7 +112,7 @@ export default function Settings() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        const response = await fetch('/api/tenants/default')
+        const response = await apiFetch('/api/tenants/default')
         if (!response.ok) {
           throw new Error('Could not load default tenant.')
         }
@@ -143,7 +144,7 @@ export default function Settings() {
     setErrorMessage(null)
 
     try {
-      const response = await fetch(`/api/tenants/${encodeURIComponent(targetTenantId)}`)
+      const response = await apiFetch(`/api/tenants/${encodeURIComponent(targetTenantId)}`)
 
       if (response.status === 404) {
         const emptyState = makeEmptyFormState()
@@ -232,7 +233,7 @@ export default function Settings() {
     setSuccessMessage(null)
 
     try {
-      const response = await fetch(`/api/tenants/${encodeURIComponent(tenantId)}`, {
+      const response = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toPayload(form)),
@@ -528,3 +529,4 @@ export default function Settings() {
     </div>
   )
 }
+
