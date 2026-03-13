@@ -507,7 +507,7 @@ export default function Settings() {
                 rows={4}
                 disabled={loading || saving}
               />
-              <small>When ticket summary contains one of these values, auto-assignment is skipped.</small>
+              <small>When ticket summary contains one of these values, rule-based auto-assignment is skipped.</small>
             </label>
           </div>
         </section>

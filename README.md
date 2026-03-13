@@ -8,7 +8,7 @@ SlackWise syncs ConnectWise service tickets, notes, and status changes into Slac
 - Store per-tenant config, routing rules, and ticket/thread mappings in DynamoDB.
 - Route tickets by rule conditions (`SUBJECT`, `CONTACT`, `COMPANY_ID`) to specific Slack channels and assignees.
 - Dashboard and Catch Up frontend pages for ticket stats and ticket actions.
-- Settings page for tenant config, automation controls, and light/dark theme.
+- Settings page for tenant config, rule-based assignment controls, and light/dark theme.
 
 ## Repository layout 🗂️
 - `src/main/java/...` Spring Boot backend (controllers, services, models).
@@ -71,7 +71,7 @@ AWS / DynamoDB ☁️:
 - `AWS_ACCESS_KEY_ID` (optional; prefer IAM role/default credential chain)
 - `AWS_SECRET_ACCESS_KEY` (optional; prefer IAM role/default credential chain)
 
-Assignment defaults 👤:
+Manual assignment defaults 👤:
 - `DEFAULT_USER_ID`
 - `DEFAULT_USER_IDENTIFIER`
 - `LEAD_CONTACT_NAME`

@@ -23,7 +23,7 @@ aws.dynamodb.table=${AWS_DYNAMODB_TABLE:}
 aws.accessKeyId=${AWS_ACCESS_KEY_ID:}
 aws.secretAccessKey=${AWS_SECRET_ACCESS_KEY:}
 
-# Assignment defaults
+# Manual assignment defaults
 lead.contact.name=${LEAD_CONTACT_NAME:}
 user.id=${DEFAULT_USER_ID:0}
 user.identifier=${DEFAULT_USER_IDENTIFIER:}

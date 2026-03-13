@@ -67,12 +67,6 @@ public class ConnectwiseController {
     // add a simple lock object to serialize onNewEvent() calls
     private final Object eventLock = new Object();
 
-    @Value("${user.id}")
-    private int userId;
-    
-    @Value("${user.identifier}")
-    private String userIdentifier;
-    
     @Value("${lead.contact.name}")
     private String leadContactName;
     
@@ -259,34 +253,26 @@ public class ConnectwiseController {
                                             
                                         // Assign ticket to user and add time entry
                                         } else {
-                                            TimeEntry timeEntry = new TimeEntry();
-
-                                            timeEntry.setTicketId(finalTicketId);
-                                            timeEntry.setDetailDescriptionFlag(false);
-                                            timeEntry.setInternalAnalysisFlag(true);
-                                            timeEntry.setResolutionFlag(false);
-                                            timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
-                                            timeEntry.setActualHours(String.valueOf(0.0));
-                                            timeEntry.setTimeEnd(null);
-                                            timeEntry.setInfo(null);
-                                            timeEntry.setEmailCcFlag(false);
-                                            timeEntry.setEmailContactFlag(false);
-                                            timeEntry.setEmailResourceFlag(false);
-
-                                            String assignedIdentifier = userIdentifier;
-                                            if (ruleAssigneeIdentifier != null && !ruleAssigneeIdentifier.isBlank()) {
-                                                try {
-                                                    connectwiseService.assignTicketToIdentifier(ruleAssigneeIdentifier, finalTicketId);
-                                                    assignedIdentifier = ruleAssigneeIdentifier;
-                                                } catch (Exception ex) {
-                                                    log.warn("Rule assignee {} could not be applied for ticketId={}, falling back to default user", ruleAssigneeIdentifier, finalTicketId, ex);
-                                                    connectwiseService.assignTicketTo(userId, userIdentifier, finalTicketId);
-                                                }
+                                            if (ruleAssigneeIdentifier == null || ruleAssigneeIdentifier.isBlank()) {
+                                                log.info("TicketId={} matched no rule assignee. Skipping auto-assignment", finalTicketId);
                                             } else {
-                                                connectwiseService.assignTicketTo(userId, userIdentifier, finalTicketId);
+                                                connectwiseService.assignTicketToIdentifier(ruleAssigneeIdentifier, finalTicketId);
+
+                                                TimeEntry timeEntry = new TimeEntry();
+                                                timeEntry.setTicketId(finalTicketId);
+                                                timeEntry.setDetailDescriptionFlag(false);
+                                                timeEntry.setInternalAnalysisFlag(true);
+                                                timeEntry.setResolutionFlag(false);
+                                                timeEntry.setTimeStart(connectwiseService.getCurrentTimeForPayload());
+                                                timeEntry.setActualHours(String.valueOf(0.0));
+                                                timeEntry.setTimeEnd(null);
+                                                timeEntry.setInfo(null);
+                                                timeEntry.setEmailCcFlag(false);
+                                                timeEntry.setEmailContactFlag(false);
+                                                timeEntry.setEmailResourceFlag(false);
+                                                timeEntry.setNotes("Assigned / " + ruleAssigneeIdentifier + " / ");
+                                                connectwiseService.addTimeEntryToTicket(finalCompanyId, String.valueOf(finalTicketId), timeEntry);
                                             }
-                                            timeEntry.setNotes("Assigned / " + assignedIdentifier + " / ");
-                                            connectwiseService.addTimeEntryToTicket(finalCompanyId, String.valueOf(finalTicketId), timeEntry);
                                         }
                                     }
                                 } catch (Exception e) {
