@@ -157,6 +157,10 @@ public class SlackController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Slack OAuth did not return a bot token");
         }
 
+        String refreshToken = oauthResponse.getRefreshToken();
+        Integer expiresIn = oauthResponse.getExpiresIn();
+        Long expiresAt = expiresIn != null ? Instant.now().plusSeconds(expiresIn.longValue()).toEpochMilli() : null;
+
         String teamId = oauthResponse.getTeam() != null ? oauthResponse.getTeam().getId() : null;
 
         TenantConfig config = amazonService.getTenantConfig(savedState.tenantId);
@@ -166,12 +170,15 @@ public class SlackController {
 
         config.setTenantId(savedState.tenantId);
         config.setSlackBotToken(botToken);
+        config.setSlackRefreshToken(refreshToken);
+        config.setSlackTokenExpiresAt(expiresAt);
         if (teamId != null && !teamId.isBlank()) {
             config.setSlackTeamId(teamId);
         }
 
         amazonService.putTenantConfig(savedState.tenantId, config);
-        log.info("Slack OAuth install completed for tenantId={} teamId={}", savedState.tenantId, teamId);
+        log.info("Slack OAuth install completed for tenantId={} teamId={} tokenRotationEnabled={}", 
+            savedState.tenantId, teamId, refreshToken != null);
 
         Map<String, String> body = new HashMap<>();
         body.put("message", "Slack workspace connected");

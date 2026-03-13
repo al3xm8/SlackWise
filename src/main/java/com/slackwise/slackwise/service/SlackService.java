@@ -46,17 +46,23 @@ public class SlackService {
     @Autowired
     private ConnectwiseService connectwiseService;
 
+    @Autowired
+    private SlackTokenManager slackTokenManager;
+
      /**
      * Handles posting a NEW ticket to Slack.
      * 
+     * @param tenantId
      * @param ticketId
      * @param summary
+     * @param slackChannelId
      * @return response from Slack API
      * @throws IOException
      * @throws SlackApiException
      * @throws InterruptedException 
      */
-    public ChatPostMessageResponse postNewTicket(String tenantId, String ticketId, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException {
+    public ChatPostMessageResponse postNewTicket(String tenantId, String ticketId, String summary, String slackChannelId) throws IOException, InterruptedException {
+        String slackBotToken = slackTokenManager.getValidBotToken(tenantId);
 
         if (slackBotToken == null || slackBotToken.isBlank()) {
             log.error("Cannot post ticketId={} to Slack: bot token is missing for tenantId={}", ticketId, tenantId);
@@ -156,7 +162,21 @@ public class SlackService {
      * @throws IOException 
      * @throws SlackApiException 
      */
-    public List<ChatPostMessageResponse> updateTicketThread(String tenantId, String ticketId, List<Note> discussion, String summary, String slackChannelId, String slackBotToken) throws IOException, InterruptedException, SlackApiException {
+    /**
+     * Update Slack thread for a ticket with new notes
+     * 
+     * @param tenantId
+     * @param ticketId
+     * @param discussion
+     * @param summary
+     * @param slackChannelId
+     * @return list of Slack responses for each posted note
+     * @throws InterruptedException 
+     * @throws IOException 
+     * @throws SlackApiException 
+     */
+    public List<ChatPostMessageResponse> updateTicketThread(String tenantId, String ticketId, List<Note> discussion, String summary, String slackChannelId) throws IOException, InterruptedException, SlackApiException {
+        String slackBotToken = slackTokenManager.getValidBotToken(tenantId);
 
         if (slackBotToken == null || slackBotToken.isBlank()) {
             log.error("Cannot update thread for ticketId={} because Slack bot token is missing for tenantId={}", ticketId, tenantId);
@@ -186,7 +206,7 @@ public class SlackService {
         // If posting the new ticket fails, abort the note posting. Don't want to spam Slack.
         if (resolvedThreadTs == null || resolvedThreadTs.isBlank()) {
             log.warn("No thread_ts found for ticketId={}, posting top-level message", ticketId);
-            postNewTicket(tenantId, ticketId, summary, slackChannelId, slackBotToken);
+            postNewTicket(tenantId, ticketId, summary, slackChannelId);
             ticket = amazonService.getTicket(tenantId, ticketId);
 
             String tsThread2 = ticket != null && ticket.containsKey("ts_thread") ? ticket.get("ts_thread").s() : null;

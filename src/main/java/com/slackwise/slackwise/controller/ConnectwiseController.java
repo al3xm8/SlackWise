@@ -227,10 +227,10 @@ public class ConnectwiseController {
                         }
 
                         log.info("Posting new Slack message for ticketId={} summary={}", ticketId, ticket.getSummary());
-                        slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId, effectiveSlackBotToken);
+                        slackService.postNewTicket(tenantId, ticketId.toString(), ticket.getSummary(), resolvedChannelId);
 
                         log.info("Updating Slack thread for ticketId={}", ticketId);
-                        slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId, effectiveSlackBotToken);
+                        slackService.updateTicketThread(tenantId, ticketId.toString(), ticket.getDiscussion(), ticket.getSummary(), resolvedChannelId);
                         
                         // Check if ticket is unassigned and assign to user if it is (with some exceptions for compliance/internal review tickets) after a delay to allow for any automatic assignment rules to run in ConnectWise first
                         final int finalTicketId = ticketId;

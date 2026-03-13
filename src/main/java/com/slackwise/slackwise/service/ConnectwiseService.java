@@ -81,6 +81,9 @@ public class ConnectwiseService {
     @Autowired
     private com.slackwise.slackwise.service.AmazonService amazonService;
 
+    @Autowired
+    private SlackTokenManager slackTokenManager;
+
 
     
     // Authorization token for ConnectWise API (Base64 encoded "publicKey:privateKey")
@@ -464,7 +467,7 @@ public class ConnectwiseService {
 
             matcher.reset();
             try {
-                parseCommands(timeEntry, matcher);
+                parseCommands(tenantId, timeEntry, matcher);
             } catch (IOException | InterruptedException e) {
                 log.error("Failed parsing commands for ticketId={}", ticketId, e);
                 return;
@@ -536,7 +539,7 @@ public class ConnectwiseService {
         }
     }
 
-    private void parseCommands(TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException, SlackApiException {        
+    private void parseCommands(String tenantId, TimeEntry timeEntry, Matcher matcher) throws IOException, InterruptedException, SlackApiException {        
         while (matcher.find()) {
             String command = matcher.group(1);
 
@@ -586,11 +589,14 @@ public class ConnectwiseService {
                 this.assignTicketTo(userId, userIdentifier, timeEntry.getTicketId());
             } else {
                 
-                ChatPostMessageResponse response = slack.methods(slackBotToken).chatPostMessage(req -> req
-                    .channel(slackChannelId)
-                    .text("ERR0R: The command $" + command + " is not recognized. Supported commands are: $actualHours=<hours>, $internal, $resolution, $ninja, $emailCc, $cc=<email1>;<email2>;<email3>, $am")
-                    .mrkdwn(true)
-                );                
+                String validToken = slackTokenManager.getValidBotToken(tenantId);
+                if (validToken != null && !validToken.isBlank()) {
+                    ChatPostMessageResponse response = slack.methods(validToken).chatPostMessage(req -> req
+                        .channel(slackChannelId)
+                        .text("ERR0R: The command $" + command + " is not recognized. Supported commands are: $actualHours=<hours>, $internal, $resolution, $ninja, $emailCc, $cc=<email1>;<email2>;<email3>, $am")
+                        .mrkdwn(true)
+                    );
+                }
                 
                 throw new IOException("The command $" + command + " is not recognized.");
             }

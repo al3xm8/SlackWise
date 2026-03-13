@@ -462,6 +462,8 @@ public class AmazonService {
 
         if (config.getSlackTeamId() != null) item.put("slackTeamId", AttributeValue.builder().s(config.getSlackTeamId()).build());
         if (config.getSlackBotToken() != null) item.put("slackBotToken", AttributeValue.builder().s(config.getSlackBotToken()).build());
+        if (config.getSlackRefreshToken() != null) item.put("slackRefreshToken", AttributeValue.builder().s(config.getSlackRefreshToken()).build());
+        if (config.getSlackTokenExpiresAt() != null) item.put("slackTokenExpiresAt", AttributeValue.builder().n(String.valueOf(config.getSlackTokenExpiresAt())).build());
         if (config.getDefaultChannelId() != null) item.put("defaultChannelId", AttributeValue.builder().s(config.getDefaultChannelId()).build());
         if (config.getConnectwiseSite() != null) item.put("connectwiseSite", AttributeValue.builder().s(config.getConnectwiseSite()).build());
         if (config.getConnectwiseClientId() != null) item.put("connectwiseClientId", AttributeValue.builder().s(config.getConnectwiseClientId()).build());
@@ -501,6 +503,10 @@ public class AmazonService {
         config.setTenantId(tenantId);
         if (item.containsKey("slackTeamId")) config.setSlackTeamId(item.get("slackTeamId").s());
         if (item.containsKey("slackBotToken")) config.setSlackBotToken(item.get("slackBotToken").s());
+        if (item.containsKey("slackRefreshToken")) config.setSlackRefreshToken(item.get("slackRefreshToken").s());
+        if (item.containsKey("slackTokenExpiresAt")) {
+            config.setSlackTokenExpiresAt(Long.valueOf(item.get("slackTokenExpiresAt").n()));
+        }
         if (item.containsKey("defaultChannelId")) config.setDefaultChannelId(item.get("defaultChannelId").s());
         if (item.containsKey("connectwiseSite")) config.setConnectwiseSite(item.get("connectwiseSite").s());
         if (item.containsKey("connectwiseClientId")) config.setConnectwiseClientId(item.get("connectwiseClientId").s());

@@ -4,6 +4,8 @@ public class TenantConfig {
     private String tenantId;
     private String slackTeamId;
     private String slackBotToken;
+    private String slackRefreshToken;
+    private Long slackTokenExpiresAt;
     private String defaultChannelId;
     private String connectwiseSite;
     private String connectwiseClientId;
@@ -37,6 +39,22 @@ public class TenantConfig {
 
     public void setSlackBotToken(String slackBotToken) {
         this.slackBotToken = slackBotToken;
+    }
+
+    public String getSlackRefreshToken() {
+        return slackRefreshToken;
+    }
+
+    public void setSlackRefreshToken(String slackRefreshToken) {
+        this.slackRefreshToken = slackRefreshToken;
+    }
+
+    public Long getSlackTokenExpiresAt() {
+        return slackTokenExpiresAt;
+    }
+
+    public void setSlackTokenExpiresAt(Long slackTokenExpiresAt) {
+        this.slackTokenExpiresAt = slackTokenExpiresAt;
     }
 
     public String getDefaultChannelId() {
