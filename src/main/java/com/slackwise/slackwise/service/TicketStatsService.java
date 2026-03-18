@@ -26,7 +26,7 @@ public class TicketStatsService {
      * @param trackedCompanyIds ConnectWise company IDs/identifiers to include
      * @return Map with stats: averageResponseTime, totalTicketsOpen, pendingClientResponse, pendingInternalResponse
      */
-    public Map<String, Object> getTicketStats(List<String> trackedCompanyIds) {
+    public Map<String, Object> getTicketStats(String tenantId, List<String> trackedCompanyIds) {
         Map<String, Object> stats = new HashMap<>();
 
         int pendingClientResponse = 0;
@@ -41,7 +41,7 @@ public class TicketStatsService {
         HashMap<String, Integer> ticketBoards = new HashMap<>();
 
         try {
-            List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyIds(trackedCompanyIds);
+            List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyIds(tenantId, trackedCompanyIds);
             openTickets = tickets.size();
 
             for (Ticket ticket : tickets) {

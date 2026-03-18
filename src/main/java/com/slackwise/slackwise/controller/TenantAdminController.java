@@ -16,8 +16,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.slackwise.slackwise.model.RoutingRule;
 import com.slackwise.slackwise.model.TenantConfig;
+import com.slackwise.slackwise.model.TenantConfigResponse;
+import com.slackwise.slackwise.model.TenantSecrets;
+import com.slackwise.slackwise.model.TenantSecretsUpdateRequest;
 import com.slackwise.slackwise.security.TenantAccessService;
 import com.slackwise.slackwise.service.AmazonService;
+import com.slackwise.slackwise.service.TenantSecretsService;
 
 @RestController
 @RequestMapping("/api/tenants")
@@ -29,6 +33,9 @@ public class TenantAdminController {
     @Autowired
     private TenantAccessService tenantAccessService;
 
+    @Autowired
+    private TenantSecretsService tenantSecretsService;
+
     @GetMapping("/default")
     public ResponseEntity<java.util.Map<String, String>> getDefaultTenant() {
         String tenantId = tenantAccessService.requiredTenantId();
@@ -36,21 +43,59 @@ public class TenantAdminController {
     }
 
     @GetMapping("/{tenantId}")
-    public ResponseEntity<TenantConfig> getTenantConfig(@PathVariable String tenantId) {
+    public ResponseEntity<TenantConfigResponse> getTenantConfig(@PathVariable String tenantId) {
         validateTenantAccess(tenantId);
         TenantConfig config = amazonService.getTenantConfig(tenantId);
-        if (config == null) {
+        TenantSecrets secrets = tenantSecretsService.getSecrets(tenantId);
+
+        if (config == null && !secrets.hasAnySecrets()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(config);
+        return ResponseEntity.ok(toResponse(tenantId, config, secrets));
     }
 
     @PutMapping("/{tenantId}")
-    public ResponseEntity<TenantConfig> putTenantConfig(@PathVariable String tenantId, @RequestBody TenantConfig config) {
+    public ResponseEntity<TenantConfigResponse> putTenantConfig(@PathVariable String tenantId, @RequestBody TenantConfig config) {
         validateTenantAccess(tenantId);
         config.setTenantId(tenantId);
+        config.setSlackBotToken(null);
+        config.setSlackRefreshToken(null);
+        config.setSlackTokenExpiresAt(null);
+        config.setConnectwiseClientId(null);
+        config.setConnectwisePublicKey(null);
+        config.setConnectwisePrivateKey(null);
         amazonService.putTenantConfig(tenantId, config);
-        return ResponseEntity.ok(config);
+        return ResponseEntity.ok(toResponse(tenantId, amazonService.getTenantConfig(tenantId), tenantSecretsService.getSecrets(tenantId)));
+    }
+
+    @PutMapping("/{tenantId}/secrets")
+    public ResponseEntity<Void> putTenantSecrets(
+        @PathVariable String tenantId,
+        @RequestBody TenantSecretsUpdateRequest request
+    ) {
+        validateTenantAccess(tenantId);
+        if (request == null || (!request.hasSlackSecretFields() && !request.hasConnectwiseSecretFields())) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (request.hasSlackSecretFields()) {
+            tenantSecretsService.upsertSlackSecrets(
+                tenantId,
+                request.getSlackBotToken(),
+                request.getSlackRefreshToken(),
+                request.getSlackTokenExpiresAt()
+            );
+        }
+        if (request.hasConnectwiseSecretFields()) {
+            tenantSecretsService.upsertConnectwiseSecrets(
+                tenantId,
+                request.getConnectwiseClientId(),
+                request.getConnectwisePublicKey(),
+                request.getConnectwisePrivateKey()
+            );
+        }
+
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{tenantId}/rules")
@@ -91,5 +136,38 @@ public class TenantAdminController {
 
     private void validateTenantAccess(String tenantId) {
         tenantAccessService.validateTenantAccess(tenantId);
+    }
+
+    private TenantConfigResponse toResponse(String tenantId, TenantConfig config, TenantSecrets secrets) {
+        TenantConfigResponse response = new TenantConfigResponse();
+        response.setTenantId(tenantId);
+        if (config != null) {
+            response.setSlackTeamId(config.getSlackTeamId());
+            response.setDefaultChannelId(config.getDefaultChannelId());
+            response.setConnectwiseSite(config.getConnectwiseSite());
+            response.setDisplayName(config.getDisplayName());
+            response.setAutoAssignmentDelayMinutes(config.getAutoAssignmentDelayMinutes());
+            response.setAssignmentExclusionKeywords(config.getAssignmentExclusionKeywords());
+            response.setTrackedCompanyIds(config.getTrackedCompanyIds());
+            response.setThemeMode(config.getThemeMode());
+        }
+
+        boolean slackConnected = (secrets != null && secrets.hasSlackAccess())
+            || (config != null && isPresent(config.getSlackBotToken()));
+        boolean connectwiseConfigured = isPresent(response.getConnectwiseSite()) && (
+            (secrets != null && secrets.hasConnectwiseCredentials())
+                || (config != null
+                    && isPresent(config.getConnectwiseClientId())
+                    && isPresent(config.getConnectwisePublicKey())
+                    && isPresent(config.getConnectwisePrivateKey()))
+        );
+
+        response.setSlackConnected(slackConnected);
+        response.setConnectwiseConfigured(connectwiseConfigured);
+        return response;
+    }
+
+    private boolean isPresent(String value) {
+        return value != null && !value.isBlank();
     }
 }

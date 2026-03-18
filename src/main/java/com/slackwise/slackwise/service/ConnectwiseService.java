@@ -31,6 +31,8 @@ import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slackwise.slackwise.model.Note;
+import com.slackwise.slackwise.model.TenantConfig;
+import com.slackwise.slackwise.model.TenantSecrets;
 import com.slackwise.slackwise.model.Ticket;
 import com.slackwise.slackwise.model.TimeEntry;
 import com.slackwise.slackwise.util.TextFormatTranslator;
@@ -84,13 +86,84 @@ public class ConnectwiseService {
     @Autowired
     private SlackTokenManager slackTokenManager;
 
+    @Autowired
+    private TenantSecretsService tenantSecretsService;
+
+    private static class ConnectwiseCredentials {
+        private final String authCompanyId;
+        private final String clientId;
+        private final String publicKey;
+        private final String privateKey;
+        private final String baseUrl;
+
+        private ConnectwiseCredentials(String authCompanyId, String clientId, String publicKey, String privateKey, String baseUrl) {
+            this.authCompanyId = authCompanyId;
+            this.clientId = clientId;
+            this.publicKey = publicKey;
+            this.privateKey = privateKey;
+            this.baseUrl = baseUrl;
+        }
+    }
+
 
     
     // Authorization token for ConnectWise API (Base64 encoded "publicKey:privateKey")
-    public String buildAuthHeader() {
-        String rawAuth = companyId + "+" + publicKey + ":" + privateKey;
+    public String buildAuthHeader(String tenantId) throws IOException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
+        String rawAuth = credentials.authCompanyId + "+" + credentials.publicKey + ":" + credentials.privateKey;
         String encodedAuth = Base64.getEncoder().encodeToString(rawAuth.getBytes());
         return "Basic " + encodedAuth;
+    }
+
+    private ConnectwiseCredentials resolveConnectwiseCredentials(String tenantId) throws IOException {
+        TenantConfig config = (tenantId != null && !tenantId.isBlank()) ? amazonService.getTenantConfig(tenantId) : null;
+        TenantSecrets secrets = (tenantId != null && !tenantId.isBlank()) ? tenantSecretsService.getSecrets(tenantId) : new TenantSecrets();
+
+        String resolvedAuthCompanyId = firstPresent(tenantId, companyId);
+        String resolvedClientId = firstPresent(secrets.getConnectwiseClientId(), config != null ? config.getConnectwiseClientId() : null, clientId);
+        String resolvedPublicKey = firstPresent(secrets.getConnectwisePublicKey(), config != null ? config.getConnectwisePublicKey() : null, publicKey);
+        String resolvedPrivateKey = firstPresent(secrets.getConnectwisePrivateKey(), config != null ? config.getConnectwisePrivateKey() : null, privateKey);
+        String resolvedBaseUrl = buildBaseUrl(config != null ? config.getConnectwiseSite() : null);
+
+        if (!isPresent(resolvedAuthCompanyId) || !isPresent(resolvedClientId) || !isPresent(resolvedPublicKey) || !isPresent(resolvedPrivateKey)) {
+            throw new IOException("ConnectWise credentials are incomplete for tenantId=" + tenantId);
+        }
+
+        return new ConnectwiseCredentials(
+            resolvedAuthCompanyId.trim(),
+            resolvedClientId.trim(),
+            resolvedPublicKey.trim(),
+            resolvedPrivateKey.trim(),
+            resolvedBaseUrl
+        );
+    }
+
+    private String buildBaseUrl(String configuredSite) {
+        if (!isPresent(configuredSite)) {
+            return baseUrl;
+        }
+
+        String trimmed = configuredSite.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed.endsWith("/v4_6_release/apis/3.0")
+                ? trimmed
+                : trimmed.replaceAll("/+$", "") + "/v4_6_release/apis/3.0";
+        }
+
+        return "https://" + trimmed + "/v4_6_release/apis/3.0";
+    }
+
+    private String firstPresent(String... values) {
+        for (String value : values) {
+            if (isPresent(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private boolean isPresent(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**
@@ -104,6 +177,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public List<Ticket> fetchOpenTicketsByCompanyId(String companyId2) throws IOException, InterruptedException {
+        return fetchOpenTicketsByCompanyId(companyId, companyId2);
+    }
+
+    public List<Ticket> fetchOpenTicketsByCompanyId(String tenantId, String companyId2) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Prepare the request to be sent to ConnectWise API
         String conditions = URLEncoder.encode(buildCompanyFilterCondition(companyId2) + " AND closedFlag=false", StandardCharsets.UTF_8);
@@ -114,9 +192,9 @@ public class ConnectwiseService {
 
         // Send the HTTP GET request to fetch ALL open tickets from companyId2
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields + "&orderBy=" + orderBy))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields + "&orderBy=" + orderBy))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET() 
             .build();
@@ -145,12 +223,12 @@ public class ConnectwiseService {
         // For each ticket, populate its time entries and notes
         for (Ticket ticket : tickets) {
             
-            Ticket fullTicket = fetchTicketById(companyId2, String.valueOf(ticket.getId()));
+            Ticket fullTicket = fetchTicketById(tenantId, companyId2, String.valueOf(ticket.getId()));
             ticket.setCompany(fullTicket.getCompany());
             ticket.setSeverity(fullTicket.getSeverity());
             ticket.setPriority(fullTicket.getPriority());
-            ticket.setTimeEntries(fetchTimeEntriesByTicketId(String.valueOf(ticket.getId())));
-            ticket.setNotes(fetchNotesByTicketId(String.valueOf(ticket.getId())));
+            ticket.setTimeEntries(fetchTimeEntriesByTicketId(tenantId, String.valueOf(ticket.getId())));
+            ticket.setNotes(fetchNotesByTicketId(tenantId, String.valueOf(ticket.getId())));
             ticket.setDiscussion(ticket.getDiscussion());
         }
         return tickets;
@@ -165,6 +243,10 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public List<Ticket> fetchOpenTicketsByCompanyIds(List<String> companyIds) throws IOException, InterruptedException {
+        return fetchOpenTicketsByCompanyIds(companyId, companyIds);
+    }
+
+    public List<Ticket> fetchOpenTicketsByCompanyIds(String tenantId, List<String> companyIds) throws IOException, InterruptedException {
         if (companyIds == null || companyIds.isEmpty()) {
             return java.util.List.of();
         }
@@ -179,7 +261,7 @@ public class ConnectwiseService {
 
             String normalizedCompanyId = companyIdValue.trim();
             try {
-                List<Ticket> companyTickets = fetchOpenTicketsByCompanyId(normalizedCompanyId);
+                List<Ticket> companyTickets = fetchOpenTicketsByCompanyId(tenantId, normalizedCompanyId);
                 for (Ticket ticket : companyTickets) {
                     mergedTickets.putIfAbsent(ticket.getId(), ticket);
                 }
@@ -244,6 +326,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public List<TimeEntry> fetchTimeEntriesByTicketId(String ticketId) throws IOException, InterruptedException {
+        return fetchTimeEntriesByTicketId(companyId, ticketId);
+    }
+
+    public List<TimeEntry> fetchTimeEntriesByTicketId(String tenantId, String ticketId) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Prepare the request to be sent to ConnectWise API
         String conditions = URLEncoder.encode("chargeToId=" + ticketId, StandardCharsets.UTF_8);
@@ -252,9 +339,9 @@ public class ConnectwiseService {
         String endpoint = "/time/entries";
         // Send the HTTP GET request to fetch time entries for the ticket
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET()
             .build();
@@ -282,14 +369,19 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public List<Note> fetchNotesByTicketId(String ticketId) throws IOException, InterruptedException {
+        return fetchNotesByTicketId(companyId, ticketId);
+    }
+
+    public List<Note> fetchNotesByTicketId(String tenantId, String ticketId) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId + "/notes";
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET()
             .build();
@@ -318,6 +410,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public Ticket fetchTicketById(String companyId2, String ticketId) throws IOException, InterruptedException {
+        return fetchTicketById(companyId, companyId2, ticketId);
+    }
+
+    public Ticket fetchTicketById(String tenantId, String companyId2, String ticketId) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Prepare the request to be sent to ConnectWise API
         String endpoint = "/service/tickets/" + ticketId;
@@ -325,9 +422,9 @@ public class ConnectwiseService {
         log.debug("Fetching ticketId={}", ticketId);
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET()
             .build();
@@ -344,8 +441,8 @@ public class ConnectwiseService {
         );
 
         // Populate the ticket's time entries, notes, and discussion
-        ticket.setTimeEntries(fetchTimeEntriesByTicketId(ticketId));
-        ticket.setNotes(fetchNotesByTicketId(ticketId));
+        ticket.setTimeEntries(fetchTimeEntriesByTicketId(tenantId, ticketId));
+        ticket.setNotes(fetchNotesByTicketId(tenantId, ticketId));
         ticket.setDiscussion(ticket.getDiscussion());
 
         return ticket;
@@ -360,8 +457,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public String getContactNameByTicketId(String ticketId) throws IOException, InterruptedException {
-        
-        Ticket ticket = fetchTicketById(companyId, ticketId);
+        return getContactNameByTicketId(companyId, ticketId);
+    }
+
+    public String getContactNameByTicketId(String tenantId, String ticketId) throws IOException, InterruptedException {
+        Ticket ticket = fetchTicketById(tenantId, tenantId, ticketId);
 
         return ticket.getContact().getName();
     }
@@ -397,13 +497,18 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public Note fetchNoteByNoteTicketId(String ticketId, String noteId) throws IOException, InterruptedException {
+        return fetchNoteByNoteTicketId(companyId, ticketId, noteId);
+    }
+
+    public Note fetchNoteByNoteTicketId(String tenantId, String ticketId, String noteId) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
         
         String endpoint = "/service/tickets/" + ticketId + "/notes/" + noteId;
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET()
             .build();   
@@ -477,7 +582,7 @@ public class ConnectwiseService {
             timeEntry.setNotes(description);
 
             String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
-            String jsonResponse = addTimeEntryToTicket(companyId, ticketId, timeEntry);
+            String jsonResponse = addTimeEntryToTicket(tenantId, tenantId, ticketId, timeEntry);
             ObjectMapper mapper = new ObjectMapper();
 
             TimeEntry created = mapper.readValue(jsonResponse, TimeEntry.class);
@@ -519,7 +624,7 @@ public class ConnectwiseService {
             timeEntry.setNotes(description);
 
             String slackTs = (String) event.getOrDefault("ts", java.time.Instant.now().toString());
-            String jsonResponse = addTimeEntryToTicket(companyId, ticketId, timeEntry);
+            String jsonResponse = addTimeEntryToTicket(tenantId, tenantId, ticketId, timeEntry);
             ObjectMapper mapper = new ObjectMapper();
 
             TimeEntry created = mapper.readValue(jsonResponse, TimeEntry.class);
@@ -584,9 +689,9 @@ public class ConnectwiseService {
                 log.debug("Set CC recipients for ticketId={}", timeEntry.getTicketId());
             
             } else if (command.equals("am")) {
-                Ticket ticket = fetchTicketById(companyId, String.valueOf(timeEntry.getTicketId()));
+                Ticket ticket = fetchTicketById(tenantId, tenantId, String.valueOf(timeEntry.getTicketId()));
 
-                this.assignTicketTo(userId, userIdentifier, timeEntry.getTicketId());
+                this.assignTicketTo(tenantId, userId, userIdentifier, timeEntry.getTicketId());
             } else {
                 
                 String validToken = slackTokenManager.getValidBotToken(tenantId);
@@ -614,9 +719,14 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public String addTimeEntryToTicket(String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
+        return addTimeEntryToTicket(companyId, companyId2, ticketId, timeEntry);
+    }
+
+    public String addTimeEntryToTicket(String tenantId, String companyId2, String ticketId, TimeEntry timeEntry) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
 
-        Ticket ticket = fetchTicketById(companyId2, ticketId);
+        Ticket ticket = fetchTicketById(tenantId, companyId2, ticketId);
 
         payload.put("company", ticket.getCompany());
         payload.put("companyType", "Client");
@@ -645,9 +755,9 @@ public class ConnectwiseService {
 
         // Send the HTTP POST request to create the time entry
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .POST(BodyPublishers.ofString(json))
             .build();
@@ -670,6 +780,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public String addNoteToTicket(String companyId2, String ticketId, Note note) throws IOException, InterruptedException {
+        return addNoteToTicket(companyId, companyId2, ticketId, note);
+    }
+
+    public String addNoteToTicket(String tenantId, String companyId2, String ticketId, Note note) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Construct the payload for the new note
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
@@ -694,9 +809,9 @@ public class ConnectwiseService {
         String endpoint = "/service/tickets/" + ticketId + "/notes";
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .POST(BodyPublishers.ofString(json))
             .build();
@@ -734,6 +849,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public void assignTicketTo(int userId, String userIdentifier, int ticketId) throws IOException, InterruptedException {
+        assignTicketTo(companyId, userId, userIdentifier, ticketId);
+    }
+
+    public void assignTicketTo(String tenantId, int userId, String userIdentifier, int ticketId) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
 
         // Build JSON Patch operations
         List<Map<String, Object>> ops = new java.util.ArrayList<>();
@@ -754,9 +874,9 @@ public class ConnectwiseService {
         String endpoint = "/service/tickets/" + ticketId;
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json") // try application/json-patch+json if needed
             .method("PATCH", BodyPublishers.ofString(json))
             .build();
@@ -766,28 +886,33 @@ public class ConnectwiseService {
     }
 
     public void assignTicketToIdentifier(String userIdentifierToAssign, int ticketId) throws IOException, InterruptedException {
+        assignTicketToIdentifier(companyId, userIdentifierToAssign, ticketId);
+    }
+
+    public void assignTicketToIdentifier(String tenantId, String userIdentifierToAssign, int ticketId) throws IOException, InterruptedException {
         if (userIdentifierToAssign == null || userIdentifierToAssign.isBlank()) {
             throw new IllegalArgumentException("userIdentifierToAssign is null/blank");
         }
 
-        Integer memberId = findMemberIdByIdentifier(userIdentifierToAssign.trim());
+        Integer memberId = findMemberIdByIdentifier(tenantId, userIdentifierToAssign.trim());
         if (memberId == null) {
             throw new IOException("Could not resolve ConnectWise member id for identifier: " + userIdentifierToAssign);
         }
 
-        assignTicketTo(memberId, userIdentifierToAssign.trim(), ticketId);
+        assignTicketTo(tenantId, memberId, userIdentifierToAssign.trim(), ticketId);
     }
 
-    private Integer findMemberIdByIdentifier(String identifier) throws IOException, InterruptedException {
+    private Integer findMemberIdByIdentifier(String tenantId, String identifier) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
         String escapedIdentifier = identifier.replace("'", "''");
         String conditions = URLEncoder.encode("identifier='" + escapedIdentifier + "'", StandardCharsets.UTF_8);
         String fields = URLEncoder.encode("id,identifier", StandardCharsets.UTF_8);
 
         String endpoint = "/system/members";
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields + "&pageSize=1"))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint + "?conditions=" + conditions + "&fields=" + fields + "&pageSize=1"))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .GET()
             .build();
@@ -821,6 +946,11 @@ public class ConnectwiseService {
      * @throws InterruptedException
      */
     public void updateTicketStatus(String companyId2, String ticketId, String statusName) throws IOException, InterruptedException {
+        updateTicketStatus(companyId, companyId2, ticketId, statusName);
+    }
+
+    public void updateTicketStatus(String tenantId, String companyId2, String ticketId, String statusName) throws IOException, InterruptedException {
+        ConnectwiseCredentials credentials = resolveConnectwiseCredentials(tenantId);
         if (statusName == null || statusName.isBlank()) {
             throw new IllegalArgumentException("statusName is null/blank");
         }
@@ -840,9 +970,9 @@ public class ConnectwiseService {
         String endpoint = "/service/tickets/" + ticketId;
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl + endpoint))
-            .header("Authorization", buildAuthHeader())
-            .header("clientId", clientId)
+            .uri(URI.create(credentials.baseUrl + endpoint))
+            .header("Authorization", buildAuthHeader(tenantId))
+            .header("clientId", credentials.clientId)
             .header("Content-Type", "application/json")
             .method("PATCH", BodyPublishers.ofString(json))
             .build();

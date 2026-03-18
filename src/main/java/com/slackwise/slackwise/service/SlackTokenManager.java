@@ -12,6 +12,7 @@ import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.oauth.OAuthV2AccessResponse;
 import com.slackwise.slackwise.model.TenantConfig;
+import com.slackwise.slackwise.model.TenantSecrets;
 
 /**
  * Manages Slack bot token refresh for token rotation-enabled apps.
@@ -29,6 +30,9 @@ public class SlackTokenManager {
     
     @Autowired
     private AmazonService amazonService;
+
+    @Autowired
+    private TenantSecretsService tenantSecretsService;
     
     @Value("${slack.client.id:}")
     private String slackClientId;
@@ -48,34 +52,46 @@ public class SlackTokenManager {
      * @return A valid bot access token, or null if no token is configured or refresh fails
      */
     public String getValidBotToken(String tenantId) {
-        TenantConfig config = amazonService.getTenantConfig(tenantId);
-        
-        if (config == null || config.getSlackBotToken() == null || config.getSlackBotToken().isBlank()) {
+        TenantSecrets secrets = tenantSecretsService.getSecrets(tenantId);
+        if (!secrets.hasSlackAccess()) {
+            TenantConfig legacyConfig = amazonService.getTenantConfig(tenantId);
+            if (legacyConfig != null && legacyConfig.getSlackBotToken() != null && !legacyConfig.getSlackBotToken().isBlank()) {
+                tenantSecretsService.upsertSlackSecrets(
+                    tenantId,
+                    legacyConfig.getSlackBotToken(),
+                    legacyConfig.getSlackRefreshToken(),
+                    legacyConfig.getSlackTokenExpiresAt()
+                );
+                secrets = tenantSecretsService.getSecrets(tenantId);
+            }
+        }
+
+        if (!secrets.hasSlackAccess()) {
             log.debug("No Slack bot token configured for tenantId={}", tenantId);
             return null;
         }
-        
+
         // If no expiration time is set, assume token doesn't need rotation (legacy token)
-        if (config.getSlackTokenExpiresAt() == null) {
+        if (secrets.getSlackTokenExpiresAt() == null) {
             log.debug("No expiration set for Slack token tenantId={}, assuming non-rotating token", tenantId);
-            return config.getSlackBotToken();
+            return secrets.getSlackBotToken();
         }
-        
+
         // Check if token needs refresh
         long now = Instant.now().toEpochMilli();
-        long expiresAt = config.getSlackTokenExpiresAt();
+        long expiresAt = secrets.getSlackTokenExpiresAt();
         long timeUntilExpiry = expiresAt - now;
-        
+
         if (timeUntilExpiry > TOKEN_REFRESH_BUFFER_SECONDS * 1000) {
             // Token is still valid, no refresh needed
             log.debug("Slack token still valid for tenantId={}, expires in {} seconds", 
                 tenantId, timeUntilExpiry / 1000);
-            return config.getSlackBotToken();
+            return secrets.getSlackBotToken();
         }
-        
+
         // Token is expired or about to expire, refresh it
         log.info("Slack token expired or expiring soon for tenantId={}, attempting refresh", tenantId);
-        return refreshToken(tenantId, config);
+        return refreshToken(tenantId, secrets);
     }
     
     /**
@@ -85,8 +101,8 @@ public class SlackTokenManager {
      * @param config The current tenant config
      * @return The new valid access token, or null if refresh fails
      */
-    private String refreshToken(String tenantId, TenantConfig config) {
-        String refreshToken = config.getSlackRefreshToken();
+    private String refreshToken(String tenantId, TenantSecrets secrets) {
+        String refreshToken = secrets.getSlackRefreshToken();
         
         if (refreshToken == null || refreshToken.isBlank()) {
             log.error("No refresh token available for tenantId={}, cannot refresh access token", tenantId);
@@ -117,12 +133,7 @@ public class SlackTokenManager {
                 return null;
             }
             
-            // Update the config with new tokens
-            config.setSlackBotToken(newAccessToken);
-            config.setSlackRefreshToken(newRefreshToken); // Both tokens rotate
-            config.setSlackTokenExpiresAt(newExpiresAt);
-            
-            amazonService.putTenantConfig(tenantId, config);
+            tenantSecretsService.upsertSlackSecrets(tenantId, newAccessToken, newRefreshToken, newExpiresAt);
             log.info("Slack token refresh successful for tenantId={}, new token expires in {} seconds", 
                 tenantId, expiresIn);
             

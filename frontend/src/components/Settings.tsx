@@ -6,43 +6,45 @@ import { apiFetch } from '../utils/apiClient'
 interface TenantConfigDto {
   tenantId?: string
   slackTeamId?: string
-  slackBotToken?: string
   defaultChannelId?: string
   connectwiseSite?: string
-  connectwiseClientId?: string
-  connectwisePublicKey?: string
-  connectwisePrivateKey?: string
   displayName?: string
   autoAssignmentDelayMinutes?: number
   assignmentExclusionKeywords?: string
   trackedCompanyIds?: string
   themeMode?: string
+  slackConnected?: boolean
+  connectwiseConfigured?: boolean
+}
+
+interface TenantSecretsUpdateRequest {
+  connectwiseClientId?: string
+  connectwisePublicKey?: string
+  connectwisePrivateKey?: string
 }
 
 interface SettingsFormState {
   displayName: string
   slackTeamId: string
-  slackBotToken: string
   defaultChannelId: string
   connectwiseSite: string
-  connectwiseClientId: string
-  connectwisePublicKey: string
-  connectwisePrivateKey: string
   autoAssignmentDelayMinutes: string
   assignmentExclusionKeywords: string
   trackedCompanyIds: string
   themeMode: ThemeMode
 }
 
+interface ConnectwiseSecretsFormState {
+  connectwiseClientId: string
+  connectwisePublicKey: string
+  connectwisePrivateKey: string
+}
+
 const makeEmptyFormState = (): SettingsFormState => ({
   displayName: '',
   slackTeamId: '',
-  slackBotToken: '',
   defaultChannelId: '',
   connectwiseSite: '',
-  connectwiseClientId: '',
-  connectwisePublicKey: '',
-  connectwisePrivateKey: '',
   autoAssignmentDelayMinutes: '',
   assignmentExclusionKeywords: '',
   trackedCompanyIds: '',
@@ -51,15 +53,17 @@ const makeEmptyFormState = (): SettingsFormState => ({
     : normalizeThemeMode(document.documentElement.getAttribute('data-theme')),
 })
 
+const makeEmptyConnectwiseSecrets = (): ConnectwiseSecretsFormState => ({
+  connectwiseClientId: '',
+  connectwisePublicKey: '',
+  connectwisePrivateKey: '',
+})
+
 const toFormState = (config?: TenantConfigDto | null): SettingsFormState => ({
   displayName: config?.displayName ?? '',
   slackTeamId: config?.slackTeamId ?? '',
-  slackBotToken: config?.slackBotToken ?? '',
   defaultChannelId: config?.defaultChannelId ?? '',
   connectwiseSite: config?.connectwiseSite ?? '',
-  connectwiseClientId: config?.connectwiseClientId ?? '',
-  connectwisePublicKey: config?.connectwisePublicKey ?? '',
-  connectwisePrivateKey: config?.connectwisePrivateKey ?? '',
   autoAssignmentDelayMinutes:
     config?.autoAssignmentDelayMinutes !== undefined && config?.autoAssignmentDelayMinutes !== null
       ? String(config.autoAssignmentDelayMinutes)
@@ -81,12 +85,8 @@ const toPayload = (form: SettingsFormState): TenantConfigDto => {
   return {
     displayName: normalize(form.displayName),
     slackTeamId: normalize(form.slackTeamId),
-    slackBotToken: normalize(form.slackBotToken),
     defaultChannelId: normalize(form.defaultChannelId),
     connectwiseSite: normalize(form.connectwiseSite),
-    connectwiseClientId: normalize(form.connectwiseClientId),
-    connectwisePublicKey: normalize(form.connectwisePublicKey),
-    connectwisePrivateKey: normalize(form.connectwisePrivateKey),
     autoAssignmentDelayMinutes:
       Number.isNaN(parsedDelay) || parsedDelay < 0
         ? undefined
@@ -97,17 +97,25 @@ const toPayload = (form: SettingsFormState): TenantConfigDto => {
   }
 }
 
+const hasConnectwiseSecretInput = (form: ConnectwiseSecretsFormState): boolean => (
+  form.connectwiseClientId.trim().length > 0
+  || form.connectwisePublicKey.trim().length > 0
+  || form.connectwisePrivateKey.trim().length > 0
+)
+
 export default function Settings() {
   const [tenantId, setTenantId] = useState('')
   const [form, setForm] = useState<SettingsFormState>(makeEmptyFormState)
   const [savedForm, setSavedForm] = useState<SettingsFormState>(makeEmptyFormState)
+  const [connectwiseSecrets, setConnectwiseSecrets] = useState<ConnectwiseSecretsFormState>(makeEmptyConnectwiseSecrets)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasExistingConfig, setHasExistingConfig] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [showSlackBotToken, setShowSlackBotToken] = useState(false)
   const [showConnectwisePrivateKey, setShowConnectwisePrivateKey] = useState(false)
+  const [slackConnected, setSlackConnected] = useState(false)
+  const [connectwiseConfigured, setConnectwiseConfigured] = useState(false)
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -150,6 +158,9 @@ export default function Settings() {
         const emptyState = makeEmptyFormState()
         setForm(emptyState)
         setSavedForm(emptyState)
+        setConnectwiseSecrets(makeEmptyConnectwiseSecrets())
+        setSlackConnected(false)
+        setConnectwiseConfigured(false)
         setHasExistingConfig(false)
         if (showReloadMessage) {
           setSuccessMessage('No saved settings found for this tenant yet.')
@@ -165,6 +176,9 @@ export default function Settings() {
       const loadedForm = toFormState(data)
       setForm(loadedForm)
       setSavedForm(loadedForm)
+      setConnectwiseSecrets(makeEmptyConnectwiseSecrets())
+      setSlackConnected(Boolean(data.slackConnected))
+      setConnectwiseConfigured(Boolean(data.connectwiseConfigured))
       setHasExistingConfig(true)
       applyThemeMode(loadedForm.themeMode)
       storeThemeMode(loadedForm.themeMode)
@@ -184,11 +198,13 @@ export default function Settings() {
   }
 
   const isDirty = useMemo(() => {
-    return Object.keys(form).some((key) => {
+    const publicDirty = Object.keys(form).some((key) => {
       const typedKey = key as keyof SettingsFormState
       return form[typedKey] !== savedForm[typedKey]
     })
-  }, [form, savedForm])
+
+    return publicDirty || hasConnectwiseSecretInput(connectwiseSecrets)
+  }, [connectwiseSecrets, form, savedForm])
 
   const handleFieldChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = event.target
@@ -204,8 +220,17 @@ export default function Settings() {
     }
   }
 
+  const handleConnectwiseSecretChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target
+    setConnectwiseSecrets((current) => ({
+      ...current,
+      [name]: value,
+    }))
+  }
+
   const handleReset = () => {
     setForm(savedForm)
+    setConnectwiseSecrets(makeEmptyConnectwiseSecrets())
     applyThemeMode(savedForm.themeMode)
     storeThemeMode(savedForm.themeMode)
     setErrorMessage(null)
@@ -228,26 +253,46 @@ export default function Settings() {
       }
     }
 
+    if (hasConnectwiseSecretInput(connectwiseSecrets) && form.connectwiseSite.trim().length === 0) {
+      setErrorMessage('Set the ConnectWise site before saving ConnectWise credentials.')
+      return
+    }
+
     setSaving(true)
     setErrorMessage(null)
     setSuccessMessage(null)
 
     try {
-      const response = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}`, {
+      const configResponse = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toPayload(form)),
       })
 
-      if (!response.ok) {
+      if (!configResponse.ok) {
         throw new Error('Failed to save tenant settings.')
       }
 
-      setSavedForm(form)
-      setHasExistingConfig(true)
-      applyThemeMode(form.themeMode)
-      storeThemeMode(form.themeMode)
-      setSuccessMessage('Settings saved to AWS.')
+      if (hasConnectwiseSecretInput(connectwiseSecrets)) {
+        const secretsPayload: TenantSecretsUpdateRequest = {
+          connectwiseClientId: connectwiseSecrets.connectwiseClientId.trim() || undefined,
+          connectwisePublicKey: connectwiseSecrets.connectwisePublicKey.trim() || undefined,
+          connectwisePrivateKey: connectwiseSecrets.connectwisePrivateKey.trim() || undefined,
+        }
+
+        const secretsResponse = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/secrets`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(secretsPayload),
+        })
+
+        if (!secretsResponse.ok) {
+          throw new Error('Failed to save ConnectWise credentials.')
+        }
+      }
+
+      await loadTenantConfig(tenantId)
+      setSuccessMessage('Settings saved. Integration credentials remain write-only and are no longer returned to the browser.')
     } catch (error: unknown) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
@@ -272,7 +317,7 @@ export default function Settings() {
   return (
     <div className="settings-container">
       <h1>Settings</h1>
-      <p>Manage tenant-level Slack and ConnectWise configuration stored in AWS DynamoDB.</p>
+      <p>Public tenant settings live in DynamoDB. Integration credentials are write-only and stored separately.</p>
 
       <section className="settings-card">
         <div className="tenant-header">
@@ -335,7 +380,10 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Slack</h2>
           <p className="settings-hint">
-            Reinstall the Slack app for this workspace to rotate or refresh the bot token.
+            Status: {slackConnected ? 'Connected' : 'Not connected'}.
+          </p>
+          <p className="settings-hint">
+            Slack bot tokens are no longer exposed in the UI. Reinstall the Slack app for this workspace to rotate or refresh access.
           </p>
           <div className="settings-inline-actions">
             <button
@@ -371,35 +419,17 @@ export default function Settings() {
                 disabled={loading || saving}
               />
             </label>
-
-            <label className="field-group field-group-full" htmlFor="slackBotToken">
-              <span>Slack Bot Token</span>
-              <div className="secret-row">
-                <input
-                  id="slackBotToken"
-                  name="slackBotToken"
-                  type={showSlackBotToken ? 'text' : 'password'}
-                  value={form.slackBotToken}
-                  onChange={handleFieldChange}
-                  placeholder="xoxb-..."
-                  disabled={loading || saving}
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  className="settings-btn settings-btn-secondary"
-                  onClick={() => setShowSlackBotToken((current) => !current)}
-                  disabled={loading || saving}
-                >
-                  {showSlackBotToken ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </label>
           </div>
         </section>
 
         <section className="settings-section">
           <h2>ConnectWise</h2>
+          <p className="settings-hint">
+            Status: {connectwiseConfigured ? 'Configured' : 'Not configured'}.
+          </p>
+          <p className="settings-hint">
+            Leave credential fields blank to keep the existing stored values. Saved credentials are write-only and will not repopulate.
+          </p>
           <div className="settings-grid">
             <label className="field-group" htmlFor="connectwiseSite">
               <span>ConnectWise Site</span>
@@ -418,10 +448,11 @@ export default function Settings() {
               <input
                 id="connectwiseClientId"
                 name="connectwiseClientId"
-                value={form.connectwiseClientId}
-                onChange={handleFieldChange}
+                value={connectwiseSecrets.connectwiseClientId}
+                onChange={handleConnectwiseSecretChange}
                 placeholder="client-id"
                 disabled={loading || saving}
+                autoComplete="off"
               />
             </label>
 
@@ -430,8 +461,8 @@ export default function Settings() {
               <input
                 id="connectwisePublicKey"
                 name="connectwisePublicKey"
-                value={form.connectwisePublicKey}
-                onChange={handleFieldChange}
+                value={connectwiseSecrets.connectwisePublicKey}
+                onChange={handleConnectwiseSecretChange}
                 placeholder="public-key"
                 disabled={loading || saving}
                 autoComplete="off"
@@ -445,8 +476,8 @@ export default function Settings() {
                   id="connectwisePrivateKey"
                   name="connectwisePrivateKey"
                   type={showConnectwisePrivateKey ? 'text' : 'password'}
-                  value={form.connectwisePrivateKey}
-                  onChange={handleFieldChange}
+                  value={connectwiseSecrets.connectwisePrivateKey}
+                  onChange={handleConnectwiseSecretChange}
                   placeholder="private-key"
                   disabled={loading || saving}
                   autoComplete="off"
@@ -529,4 +560,3 @@ export default function Settings() {
     </div>
   )
 }
-

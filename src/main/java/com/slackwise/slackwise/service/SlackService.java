@@ -93,13 +93,13 @@ public class SlackService {
 
         // Get the contact name for a new ticket
         String contactName = "N\\A";
-        if (connectwiseService.getContactNameByTicketId(ticketId) == null) {
-            Ticket ticket = connectwiseService.fetchTicketById("", ticketId);
+        if (connectwiseService.getContactNameByTicketId(tenantId, ticketId) == null) {
+            Ticket ticket = connectwiseService.fetchTicketById(tenantId, tenantId, ticketId);
             if (ticket.getContact() != null) {
-                contactName = connectwiseService.getContactNameByTicketId(ticketId);
+                contactName = connectwiseService.getContactNameByTicketId(tenantId, ticketId);
             }
         } else {
-            contactName = connectwiseService.getContactNameByTicketId(ticketId);
+            contactName = connectwiseService.getContactNameByTicketId(tenantId, ticketId);
         }
 
         final String finalContactName = contactName;

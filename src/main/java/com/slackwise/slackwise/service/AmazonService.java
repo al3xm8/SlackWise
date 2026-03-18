@@ -455,20 +455,16 @@ public class AmazonService {
         if (tenantId == null || tenantId.isBlank()) throw new IllegalArgumentException("tenantId is null/blank");
         if (config == null) throw new IllegalArgumentException("config is null");
 
+        TenantConfig existingConfig = getTenantConfig(tenantId);
+
         Map<String, AttributeValue> item = new java.util.HashMap<>();
         item.put("tenantId", AttributeValue.builder().s(tenantId).build());
         item.put("sk", AttributeValue.builder().s(SK_CONFIG).build());
         item.put("itemType", AttributeValue.builder().s("CONFIG").build());
 
         if (config.getSlackTeamId() != null) item.put("slackTeamId", AttributeValue.builder().s(config.getSlackTeamId()).build());
-        if (config.getSlackBotToken() != null) item.put("slackBotToken", AttributeValue.builder().s(config.getSlackBotToken()).build());
-        if (config.getSlackRefreshToken() != null) item.put("slackRefreshToken", AttributeValue.builder().s(config.getSlackRefreshToken()).build());
-        if (config.getSlackTokenExpiresAt() != null) item.put("slackTokenExpiresAt", AttributeValue.builder().n(String.valueOf(config.getSlackTokenExpiresAt())).build());
         if (config.getDefaultChannelId() != null) item.put("defaultChannelId", AttributeValue.builder().s(config.getDefaultChannelId()).build());
         if (config.getConnectwiseSite() != null) item.put("connectwiseSite", AttributeValue.builder().s(config.getConnectwiseSite()).build());
-        if (config.getConnectwiseClientId() != null) item.put("connectwiseClientId", AttributeValue.builder().s(config.getConnectwiseClientId()).build());
-        if (config.getConnectwisePublicKey() != null) item.put("connectwisePublicKey", AttributeValue.builder().s(config.getConnectwisePublicKey()).build());
-        if (config.getConnectwisePrivateKey() != null) item.put("connectwisePrivateKey", AttributeValue.builder().s(config.getConnectwisePrivateKey()).build());
         if (config.getDisplayName() != null) item.put("displayName", AttributeValue.builder().s(config.getDisplayName()).build());
         if (config.getAutoAssignmentDelayMinutes() != null) {
             item.put("autoAssignmentDelayMinutes", AttributeValue.builder().n(String.valueOf(config.getAutoAssignmentDelayMinutes())).build());
@@ -481,6 +477,24 @@ public class AmazonService {
         }
         if (config.getThemeMode() != null) {
             item.put("themeMode", AttributeValue.builder().s(config.getThemeMode()).build());
+        }
+        if (existingConfig != null && existingConfig.getSlackBotToken() != null) {
+            item.put("slackBotToken", AttributeValue.builder().s(existingConfig.getSlackBotToken()).build());
+        }
+        if (existingConfig != null && existingConfig.getSlackRefreshToken() != null) {
+            item.put("slackRefreshToken", AttributeValue.builder().s(existingConfig.getSlackRefreshToken()).build());
+        }
+        if (existingConfig != null && existingConfig.getSlackTokenExpiresAt() != null) {
+            item.put("slackTokenExpiresAt", AttributeValue.builder().n(String.valueOf(existingConfig.getSlackTokenExpiresAt())).build());
+        }
+        if (existingConfig != null && existingConfig.getConnectwiseClientId() != null) {
+            item.put("connectwiseClientId", AttributeValue.builder().s(existingConfig.getConnectwiseClientId()).build());
+        }
+        if (existingConfig != null && existingConfig.getConnectwisePublicKey() != null) {
+            item.put("connectwisePublicKey", AttributeValue.builder().s(existingConfig.getConnectwisePublicKey()).build());
+        }
+        if (existingConfig != null && existingConfig.getConnectwisePrivateKey() != null) {
+            item.put("connectwisePrivateKey", AttributeValue.builder().s(existingConfig.getConnectwisePrivateKey()).build());
         }
 
         dynamoDb.putItem(PutItemRequest.builder()

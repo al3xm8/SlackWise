@@ -19,17 +19,21 @@ interface OnboardingPageProps {
 interface TenantConfigDto {
   tenantId?: string
   slackTeamId?: string
-  slackBotToken?: string
   defaultChannelId?: string
   connectwiseSite?: string
-  connectwiseClientId?: string
-  connectwisePublicKey?: string
-  connectwisePrivateKey?: string
   displayName?: string
   autoAssignmentDelayMinutes?: number
   assignmentExclusionKeywords?: string
   trackedCompanyIds?: string
   themeMode?: string
+  slackConnected?: boolean
+  connectwiseConfigured?: boolean
+}
+
+interface TenantSecretsUpdateRequest {
+  connectwiseClientId?: string
+  connectwisePublicKey?: string
+  connectwisePrivateKey?: string
 }
 
 interface ConnectWiseFormState {
@@ -56,13 +60,13 @@ const looksLikeSlackChannelId = (value: string): boolean => /^[CG][A-Z0-9]{8,}$/
 function extractConnectWiseForm(config: TenantConfigDto): ConnectWiseFormState {
   return {
     connectwiseSite: config.connectwiseSite ?? '',
-    connectwiseClientId: config.connectwiseClientId ?? '',
-    connectwisePublicKey: config.connectwisePublicKey ?? '',
-    connectwisePrivateKey: config.connectwisePrivateKey ?? '',
+    connectwiseClientId: '',
+    connectwisePublicKey: '',
+    connectwisePrivateKey: '',
   }
 }
 
-function hasConnectWiseConfig(config: TenantConfigDto): boolean {
+function hasConnectWiseInput(config: ConnectWiseFormState): boolean {
   return (
     isPresent(config.connectwiseSite) &&
     isPresent(config.connectwiseClientId) &&
@@ -87,9 +91,9 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const slackConnected = useMemo(() => isPresent(config.slackBotToken), [config.slackBotToken])
+  const slackConnected = useMemo(() => Boolean(config.slackConnected), [config.slackConnected])
   const slackChannelSaved = useMemo(() => isPresent(config.defaultChannelId), [config.defaultChannelId])
-  const connectWiseConfigured = useMemo(() => hasConnectWiseConfig(config), [config])
+  const connectWiseConfigured = useMemo(() => Boolean(config.connectwiseConfigured), [config.connectwiseConfigured])
   const slackStageComplete = slackConnected && slackChannelSaved && botInvited
   const onboardingComplete = slackStageComplete && connectWiseConfigured
   const completedSections = (slackStageComplete ? 1 : 0) + (connectWiseConfigured ? 1 : 0)
@@ -126,9 +130,15 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
 
     const latestConfig = await fetchTenantConfig(tenantId)
     const mergedPayload: TenantConfigDto = {
-      ...latestConfig,
-      ...patch,
       tenantId,
+      slackTeamId: patch.slackTeamId ?? latestConfig.slackTeamId,
+      defaultChannelId: patch.defaultChannelId ?? latestConfig.defaultChannelId,
+      connectwiseSite: patch.connectwiseSite ?? latestConfig.connectwiseSite,
+      displayName: patch.displayName ?? latestConfig.displayName,
+      autoAssignmentDelayMinutes: patch.autoAssignmentDelayMinutes ?? latestConfig.autoAssignmentDelayMinutes,
+      assignmentExclusionKeywords: patch.assignmentExclusionKeywords ?? latestConfig.assignmentExclusionKeywords,
+      trackedCompanyIds: patch.trackedCompanyIds ?? latestConfig.trackedCompanyIds,
+      themeMode: patch.themeMode ?? latestConfig.themeMode,
     }
 
     const response = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}`, {
@@ -141,7 +151,23 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
       throw new Error('Failed to save tenant configuration')
     }
 
-    return await fetchTenantConfig(tenantId)
+    return await response.json() as TenantConfigDto
+  }
+
+  const putTenantSecrets = async (payload: TenantSecretsUpdateRequest): Promise<void> => {
+    if (!tenantId) {
+      throw new Error('Tenant ID is not available yet')
+    }
+
+    const response = await apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/secrets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to save tenant secrets')
+    }
   }
 
   useEffect(() => {
@@ -201,7 +227,7 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
     try {
       const nextConfig = await fetchTenantConfig(tenantId)
       applyConfig(nextConfig)
-      if (isPresent(nextConfig.slackBotToken)) {
+      if (nextConfig.slackConnected) {
         setSuccessMessage('Slack connection confirmed.')
       } else {
         setSuccessMessage('Slack not connected yet. Finish Slack install, then recheck.')
@@ -272,7 +298,7 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
       connectwisePrivateKey: connectWiseForm.connectwisePrivateKey.trim(),
     }
 
-    if (!hasConnectWiseConfig(payload)) {
+    if (!hasConnectWiseInput(payload)) {
       setErrorMessage('All ConnectWise fields are required before you continue.')
       return
     }
@@ -280,9 +306,15 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
     setSavingConnectWise(true)
 
     try {
-      const nextConfig = await putTenantConfig(payload)
+      await putTenantConfig({ connectwiseSite: payload.connectwiseSite })
+      await putTenantSecrets({
+        connectwiseClientId: payload.connectwiseClientId,
+        connectwisePublicKey: payload.connectwisePublicKey,
+        connectwisePrivateKey: payload.connectwisePrivateKey,
+      })
+      const nextConfig = await fetchTenantConfig(tenantId)
       applyConfig(nextConfig)
-      setSuccessMessage('ConnectWise credentials saved. You can now finish onboarding.')
+      setSuccessMessage('ConnectWise credentials saved. Stored credentials are now write-only.')
     } catch {
       setErrorMessage('Failed to save ConnectWise credentials.')
     } finally {
@@ -358,6 +390,10 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
             </button>
           </div>
 
+          <p className="onboarding-stage-note">
+            Current Slack status: {slackConnected ? 'Connected' : 'Not connected'}.
+          </p>
+
           <form className="onboarding-stage-form" onSubmit={handleSaveSlackChannel}>
             <label htmlFor="defaultChannelId">Default Slack Channel ID</label>
             <input
@@ -401,7 +437,7 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
           </div>
 
           <p className="onboarding-stage-note">
-            Use these pages to create your Client ID and API keys.
+            Use these pages to create your Client ID and API keys. Saved credentials are write-only and won&apos;t appear again after save.
           </p>
 
           <div className="onboarding-link-list">
@@ -501,7 +537,3 @@ export default function OnboardingPage({ userName, onComplete, onSignOut }: Onbo
     </div>
   )
 }
-
-
-
-

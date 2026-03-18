@@ -53,7 +53,7 @@ public class TicketController {
     public ResponseEntity<Map<String, Object>> getTicketStats() {
         String tenantId = resolveTenantId();
         List<String> trackedCompanyIds = resolveTrackedCompanyIds(tenantId);
-        Map<String, Object> stats = ticketStatsService.getTicketStats(trackedCompanyIds);
+        Map<String, Object> stats = ticketStatsService.getTicketStats(tenantId, trackedCompanyIds);
         return ResponseEntity.ok(stats);
     }
 
@@ -61,7 +61,7 @@ public class TicketController {
     public ResponseEntity<List<Ticket>> getOpenTickets() throws IOException, InterruptedException {
         String tenantId = resolveTenantId();
         List<String> trackedCompanyIds = resolveTrackedCompanyIds(tenantId);
-        List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyIds(trackedCompanyIds);
+        List<Ticket> tickets = connectwiseService.fetchOpenTicketsByCompanyIds(tenantId, trackedCompanyIds);
         return ResponseEntity.ok(tickets);
     }
 
@@ -83,7 +83,7 @@ public class TicketController {
         note.setInternalAnalysisFlag(Boolean.TRUE.equals(request.getInternalAnalysisFlag()));
         note.setResolutionFlag(Boolean.TRUE.equals(request.getResolutionFlag()));
 
-        connectwiseService.addNoteToTicket(companyScope, ticketId, note);
+        connectwiseService.addNoteToTicket(tenantId, companyScope, ticketId, note);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Response added"));
     }
 
@@ -98,7 +98,7 @@ public class TicketController {
 
         String tenantId = resolveTenantId();
         String companyScope = resolveCompanyScopeForTicket(tenantId, ticketId);
-        connectwiseService.updateTicketStatus(companyScope, ticketId, request.getStatus());
+        connectwiseService.updateTicketStatus(tenantId, companyScope, ticketId, request.getStatus());
         return ResponseEntity.ok(Map.of("message", "Status updated"));
     }
 
@@ -127,7 +127,7 @@ public class TicketController {
         }
 
         try {
-            Ticket ticket = connectwiseService.fetchTicketById(trackedCompanyIds.get(0), ticketId);
+            Ticket ticket = connectwiseService.fetchTicketById(tenantId, trackedCompanyIds.get(0), ticketId);
             if (ticket != null && ticket.getCompany() != null) {
                 if (ticket.getCompany().getId() > 0) {
                     String discoveredCompanyId = String.valueOf(ticket.getCompany().getId());

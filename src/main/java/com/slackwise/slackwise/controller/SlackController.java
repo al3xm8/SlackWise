@@ -38,6 +38,7 @@ import com.slack.api.methods.response.oauth.OAuthV2AccessResponse;
 import com.slackwise.slackwise.model.TenantConfig;
 import com.slackwise.slackwise.service.AmazonService;
 import com.slackwise.slackwise.service.ConnectwiseService;
+import com.slackwise.slackwise.service.TenantSecretsService;
 
 @RestController
 @RequestMapping("/api/slack")
@@ -53,6 +54,9 @@ public class SlackController {
 
     @Autowired
     ConnectwiseService connectwiseService;
+
+    @Autowired
+    TenantSecretsService tenantSecretsService;
 
     @Value("${company.id}")
     private String tenantId;
@@ -169,13 +173,11 @@ public class SlackController {
         }
 
         config.setTenantId(savedState.tenantId);
-        config.setSlackBotToken(botToken);
-        config.setSlackRefreshToken(refreshToken);
-        config.setSlackTokenExpiresAt(expiresAt);
         if (teamId != null && !teamId.isBlank()) {
             config.setSlackTeamId(teamId);
         }
 
+        tenantSecretsService.upsertSlackSecrets(savedState.tenantId, botToken, refreshToken, expiresAt);
         amazonService.putTenantConfig(savedState.tenantId, config);
         log.info("Slack OAuth install completed for tenantId={} teamId={} tokenRotationEnabled={}", 
             savedState.tenantId, teamId, refreshToken != null);
@@ -398,4 +400,3 @@ public class SlackController {
         return ResponseEntity.ok("OK");
     }
 }
-

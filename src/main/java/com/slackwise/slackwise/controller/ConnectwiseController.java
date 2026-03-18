@@ -29,6 +29,7 @@ import com.slackwise.slackwise.service.AmazonService;
 import com.slackwise.slackwise.service.SlackService;
 import com.slackwise.slackwise.service.ConnectwiseService;
 import com.slackwise.slackwise.service.RoutingService;
+import com.slackwise.slackwise.service.SlackTokenManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.api.methods.SlackApiException;
@@ -59,6 +60,9 @@ public class ConnectwiseController {
     @Autowired
     AmazonService amazonService;
 
+    @Autowired
+    SlackTokenManager slackTokenManager;
+
     Tenant tenant;
 
     // Deprecated: now using database to track which tickets have been posted to Slack
@@ -69,10 +73,6 @@ public class ConnectwiseController {
 
     @Value("${lead.contact.name}")
     private String leadContactName;
-    
-    // Slack configuration properties
-    @Value("${slack.bot.token}")
-    private String slackBotToken;
     
     @Value("${slack.channel.id}")
     private String slackChannelId;
@@ -142,7 +142,7 @@ public class ConnectwiseController {
             Set<String> trackedCompanyIds = resolveTrackedCompanyIds(tenantConfig);
             int autoAssignmentDelayMinutes = resolveAutoAssignmentDelayMinutes(tenantConfig);
             Set<String> assignmentExclusionKeywords = resolveAssignmentExclusionKeywords(tenantConfig);
-            String effectiveSlackBotToken = resolveSlackBotToken(tenantConfig);
+            String effectiveSlackBotToken = resolveSlackBotToken(tenantId);
             String effectiveDefaultChannelId = resolveDefaultSlackChannelId(tenantConfig);
 
             /*
@@ -199,7 +199,7 @@ public class ConnectwiseController {
             
             // Only process if the companyId is in our tenant-config tracked list
             if (trackedCompanyIds.contains(companyId)) {
-                Ticket ticket = connectwiseService.fetchTicketById(companyId, ticketId.toString());
+                Ticket ticket = connectwiseService.fetchTicketById(tenantId, companyId, ticketId.toString());
 
                 // If ticketFetch successful
                 if (ticket != null) {
@@ -239,7 +239,7 @@ public class ConnectwiseController {
                                     if (finalAutoAssignmentDelayMinutes > 0) {
                                         Thread.sleep(finalAutoAssignmentDelayMinutes * 60000L);
                                     }
-                                    Ticket ticket2 = connectwiseService.fetchTicketById(finalCompanyId, String.valueOf(finalTicketId));
+                                    Ticket ticket2 = connectwiseService.fetchTicketById(tenantId, finalCompanyId, String.valueOf(finalTicketId));
                                     log.info("Re-fetched ticketId={} after delay to check assignment", finalTicketId);
 
                                     if (ticket2.getOwner() != null) {
@@ -256,7 +256,7 @@ public class ConnectwiseController {
                                             if (ruleAssigneeIdentifier == null || ruleAssigneeIdentifier.isBlank()) {
                                                 log.info("TicketId={} matched no rule assignee. Skipping auto-assignment", finalTicketId);
                                             } else {
-                                                connectwiseService.assignTicketToIdentifier(ruleAssigneeIdentifier, finalTicketId);
+                                                connectwiseService.assignTicketToIdentifier(tenantId, ruleAssigneeIdentifier, finalTicketId);
 
                                                 TimeEntry timeEntry = new TimeEntry();
                                                 timeEntry.setTicketId(finalTicketId);
@@ -271,7 +271,7 @@ public class ConnectwiseController {
                                                 timeEntry.setEmailContactFlag(false);
                                                 timeEntry.setEmailResourceFlag(false);
                                                 timeEntry.setNotes("Assigned / " + ruleAssigneeIdentifier + " / ");
-                                                connectwiseService.addTimeEntryToTicket(finalCompanyId, String.valueOf(finalTicketId), timeEntry);
+                                                connectwiseService.addTimeEntryToTicket(tenantId, finalCompanyId, String.valueOf(finalTicketId), timeEntry);
                                             }
                                         }
                                     }
@@ -352,11 +352,9 @@ public class ConnectwiseController {
         return values;
     }
 
-    private String resolveSlackBotToken(TenantConfig config) {
-        if (config != null && config.getSlackBotToken() != null && !config.getSlackBotToken().isBlank()) {
-            return config.getSlackBotToken().trim();
-        }
-        return slackBotToken != null ? slackBotToken.trim() : "";
+    private String resolveSlackBotToken(String currentTenantId) {
+        String validToken = slackTokenManager.getValidBotToken(currentTenantId);
+        return validToken != null ? validToken.trim() : "";
     }
 
     private String resolveDefaultSlackChannelId(TenantConfig config) {
